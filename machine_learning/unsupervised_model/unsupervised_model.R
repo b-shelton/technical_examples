@@ -1,7 +1,6 @@
 #load required packages
 
-packages <- c("aws.s3",
-              "data.table",
+packages <- c("data.table",
               "stats",
               "ggplot2",
               "dplyr",
