@@ -120,8 +120,9 @@ cluster_chart <- function(x, y) {
   v <- ggplot(u, aes(x = hcpcs, y = Mean, fill = Color)) +
     geom_bar(stat = 'identity', position = "identity", width = .75) +
     facet_grid(Cluster ~ .) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1),
-          axis.text.y = element_text(size = 8),
+    theme(axis.text.x = element_blank(),
+          axis.text.y = element_text(size = 7),
+          plot.title = element_text(size=12),
           legend.position = "none") +
     labs(y = "Standard Deviations from Mean",
          title = paste0("Standard Deviations from Means Comparison '", y,
