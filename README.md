@@ -1,4 +1,7 @@
+![alt text](https://img.shields.io/github/languages/count/b-shelton/technical_examples)
+
 ![alt text](https://img.shields.io/github/languages/top/b-shelton/technical_examples)
+
 ![alt text](https://img.shields.io/github/languages/code-size/b-shelton/technical_examples)
 
 # Technical Examples
