@@ -16,6 +16,7 @@ Once the instance is launched, SSH into it using the paired `.pem` key and run t
   - Update the /etc/shiny-server/shiny-server.conf file to add access the _*ahp*_ and _*countdown*_ Shiny applications
   - Move the _*ahp*_ and _*countdown*_ Shiny applications to the appropriate location to be accessed by Shiny Server
 ```
+sudo -s
 cd /home/ec2-user
 yum install -y git-all
 git clone https://github.com/b-shelton/technical_examples.git
