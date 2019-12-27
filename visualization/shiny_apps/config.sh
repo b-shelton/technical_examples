@@ -40,28 +40,13 @@ sudo su - -c "R -e \"install.packages(c('lubridate'), repos='http://cran.rstudio
 sudo yum install -y compat-gmp4
 sudo yum install -y compat-libffi5
 
-#add user(s)
-# sudo useradd -m bshelton
-# sudo passwd bshelton
-
-
-# use vim /etc/shiny-server/shiny-server.conf to view where the programs need to be placed
-# default is /srv/shiny-server
-
-# add github directory and download repo with shiny apps
-cd /home/ec2-user
-mkdir github
-cd github
-yum install -y git-all
-git clone https://github.com/b-shelton/technical_examples.git
-
 # update the shiny server .conf file
-sudo cp /home/ec2-user/github/technical_examples/visualization/shiny_apps/shiny-server.conf /etc/shiny-server/shiny-server.conf
+sudo cp /home/ec2-user/technical_examples/visualization/shiny_apps/shiny-server.conf /etc/shiny-server/shiny-server.conf
 
 
 # copy shiny packages to necessary shiny server location
-sudo cp -R /home/ec2-user/github/technical_examples/visualization/shiny_apps/ahp /srv/shiny-server/
-sudo cp -R /home/ec2-user/github/technical_examples/visualization/shiny_apps/countdown /srv/shiny-server/
+sudo cp -R /home/ec2-user/technical_examples/visualization/shiny_apps/ahp /srv/shiny-server/
+sudo cp -R /home/ec2-user/technical_examples/visualization/shiny_apps/countdown /srv/shiny-server/
 
 # restart Shiny-Server
 sudo systemd restart shiny-server
