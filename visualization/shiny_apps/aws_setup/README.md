@@ -20,7 +20,10 @@ sudo -s
 cd /home/ec2-user
 yum install -y git-all
 git clone https://github.com/b-shelton/technical_examples.git
-bash /home/ec2-user/technical_examples/visualization/shiny_apps/aws_setup/config.sh
+
+# give execute permissions to config.sh file
+chmod 777 /home/ec2-user/technical_examples/visualization/shiny_apps/aws_setup/config.sh
+/home/ec2-user/technical_examples/visualization/shiny_apps/aws_setup/config.sh
 ```
 
 ### Step 3 - Add user names and passwords
