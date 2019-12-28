@@ -3,7 +3,6 @@
 # running on Amazon Linux AMI 2018.03.0 (HVM), SSD Volume Type small tier in AWS
 # with appropriate ports opened for RStudio and Shiny
 sudo -s
-
 yum update -y
 
 # Update the machine
@@ -16,15 +15,10 @@ sudo yum -y install libcurl-devel openssl-devel # used for devtools
 # Install programs that assist APIs
 sudo yum -y install libxml2 libxml2-devel
 
-
 # Install R
 echo Installing R...
 sudo su
 yum install -y R
-
-#  Install PostgreSQL
-#yum install -y postgresql-devel
-
 
 # Install RStudio Server - change version when installing your Rstudio:
 # https://support.rstudio.com/hc/en-us/articles/206569407-Older-Versions-of-RStudio
@@ -56,7 +50,6 @@ sudo yum install -y compat-libffi5
 # update the shiny server .conf file
 echo Updating the Shiny Server config file...
 sudo cp /home/ec2-user/github/technical_examples/visualization/shiny_apps/shiny-server.conf /etc/shiny-server/shiny-server.conf
-
 
 # copy shiny packages to necessary shiny server location
 echo Adding Shiny Apps from GitHub to the necessary location on the server...
