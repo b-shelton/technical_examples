@@ -2,14 +2,16 @@
 
 # running on Amazon Linux AMI 2018.03.0 (HVM), SSD Volume Type small tier in AWS
 # with appropriate ports opened for RStudio and Shiny
+echo Starting update...
 sudo -s
 yum update -y
 
 # Update the machine
-echo updating the Operating System...
+echo Updating the Operating System...
 sudo yum -y update
 
 # Install programs that run well with the devtools package
+echo Installing devtools packages...
 sudo yum -y install libcurl-devel openssl-devel # used for devtools
 
 # Install programs that assist APIs
