@@ -3,6 +3,7 @@ import numpy as np
 import re
 import time
 import requests
+import os
 from bs4 import BeautifulSoup
 import s3fs
 import re
@@ -18,14 +19,14 @@ for z in range(13):
   url = "https://www.espn.com/college-football/scoreboard/_/group/80/year/2019/seasontype/2/week/"+str(z+1)
   r1 = requests.get(url)
   coverpage = r1.content
-
+  #
   soup1 = BeautifulSoup(coverpage, 'html.parser')
   test = soup1.find_all('script', text = re.compile('window.espn.scoreboardData'))
   test = str(test)
   test = test.split('= ', 1)[1]
   test = test.split(';window', 1)[0]
   d = json.loads(test)
-
+  #
   for k in range(len(d['events'])):
     game_id = d['events'][k]['competitions'][0]['id']
     start_date = d['events'][k]['competitions'][0]['startDate']
@@ -57,7 +58,7 @@ for z in range(13):
             'pbp_link':pbp_link,
             'week':z+1}
     games.append(game)
-
+  #
   for k in range(len(d['events'])):
     game_id = d['events'][k]['competitions'][0]['id']
     for i in range(len(d['events'][k]['competitions'][0]['competitors'])):
@@ -103,10 +104,16 @@ for z in range(13):
                   'rank':rank}
       opponents.append(opponent)
   print("completed week " + str(z+1))
-
+  
 games = pd.DataFrame(games)
 opponents = pd.DataFrame(opponents)
 
+
+os.system('mkdir /home/ec2-user/tmp')
+games.to_csv('/home/ec2-user/tmp/games.csv', index = None, header = True)
+opponents.to_csv('/home/ec2-user/tmp/opponents.csv', index = None, header = True)
+os.system('aws s3 sync /home/ec2-user/tmp s3://b-shelton-sports')
+os.system('rm -rf /home/ec2-user/tmp')
 
 # Get the play-by-play for every game
 plays = []
