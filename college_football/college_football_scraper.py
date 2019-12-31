@@ -3,6 +3,7 @@ import numpy as np
 import re
 import time
 import requests
+import os
 from bs4 import BeautifulSoup
 import s3fs
 import re
@@ -108,7 +109,7 @@ for z in range(13):
                   'rank':rank}
       opponents.append(opponent)
   print("completed week " + str(z+1))
-
+  
 games = pd.DataFrame(games)
 opponents = pd.DataFrame(opponents)
 
@@ -124,6 +125,12 @@ for i in range(games.shape[0]):
     team_stats = soup2.find_all('tr', class_="highlight")
     for j in range()
 
+
+os.system('mkdir /home/ec2-user/tmp')
+games.to_csv('/home/ec2-user/tmp/games.csv', index = None, header = True)
+opponents.to_csv('/home/ec2-user/tmp/opponents.csv', index = None, header = True)
+os.system('aws s3 sync /home/ec2-user/tmp s3://b-shelton-sports')
+os.system('rm -rf /home/ec2-user/tmp')
 
 # Get the play-by-play for every game
 plays = []
