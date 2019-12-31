@@ -18,14 +18,14 @@ for z in range(13):
   url = "https://www.espn.com/college-football/scoreboard/_/group/80/year/2019/seasontype/2/week/"+str(z+1)
   r1 = requests.get(url)
   coverpage = r1.content
-
+  #
   soup1 = BeautifulSoup(coverpage, 'html.parser')
   test = soup1.find_all('script', text = re.compile('window.espn.scoreboardData'))
   test = str(test)
   test = test.split('= ', 1)[1]
   test = test.split(';window', 1)[0]
   d = json.loads(test)
-
+  #
   for k in range(len(d['events'])):
     game_id = d['events'][k]['competitions'][0]['id']
     start_date = d['events'][k]['competitions'][0]['startDate']
@@ -46,6 +46,8 @@ for z in range(13):
     for i in range(len(d['events'][k]['links'])):
       if "playbyplay" in d['events'][k]['links'][i]['href']:
         pbp_link = d['events'][k]['links'][i]['href']
+      if "boxscore" in d['events'][k]['links'][i]['href']:
+        boxscore_link = d['events'][k]['links'][i]['href']
     game = {'game_id':game_id,
             'start_date':start_date,
             'venue_id':venue_id,
@@ -55,13 +57,15 @@ for z in range(13):
             'broadcast_market':broadcast_market,
             'broadcast_network':broadcast_network,
             'pbp_link':pbp_link,
+            'boxscore_link':boxscore_link,
             'week':z+1}
     games.append(game)
-
+  #
   for k in range(len(d['events'])):
     game_id = d['events'][k]['competitions'][0]['id']
     for i in range(len(d['events'][k]['competitions'][0]['competitors'])):
       team_id = d['events'][k]['competitions'][0]['competitors'][i]['team']['id']
+      team = d['events'][k]['competitions'][0]['competitors'][i]['team']['location']
       team_abbr = d['events'][k]['competitions'][0]['competitors'][i]['team']['abbreviation']
       home_away = d['events'][k]['competitions'][0]['competitors'][i]['homeAway']
       # in the event that a game is postponed, there may not be a winner or scores populated.
@@ -92,6 +96,7 @@ for z in range(13):
       rank = d['events'][k]['competitions'][0]['competitors'][i]['curatedRank']['current']
       opponent = {'game_id':game_id,
                   'team_id':team_id,
+                  'team': team,
                   'team_abbr':team_abbr,
                   'home_away':home_away,
                   'winner':winner,
@@ -107,6 +112,18 @@ for z in range(13):
 games = pd.DataFrame(games)
 opponents = pd.DataFrame(opponents)
 
+# Get the game stats for every team in every game
+pass_yds = []
+rush_yds = []
+for i in range(games.shape[0]):
+    print(i)
+    url = games.iloc[i]['boxscore_link']
+    r1 = requests.get(url)
+    coverpage = r1.content
+    soup2 = BeautifulSoup(coverpage, 'html.parser')
+    team_stats = soup2.find_all('tr', class_="highlight")
+    for j in range()
+
 
 # Get the play-by-play for every game
 plays = []
@@ -120,7 +137,7 @@ for i in range(games.shape[0]):
   for j in range(len(pbp)):
     # no need to bring back data on end of quarters or game
     if "End of" not in pbp[j].get_text():
-
+      #
       play = pbp[j].get_text()
       # get the down and field position
       d_fp = play.split('\n', 1)[1]
@@ -128,11 +145,263 @@ for i in range(games.shape[0]):
         d_fp = d_fp.split('\n', 1)[0]
       else:
         d_fp = ''
-
+      #
       # get the play
       action = '(' + play.split('\t(', 1)[1]
       action = action.split('\n', 1)[0]
-
+      #
       play = {'game_id':games.iloc[i]['game_id'], 'd_fp':d_fp, 'play':action}
       plays.append(play)
+
 plays = pd.DataFrame(plays)
+
+
+
+
+
+# Get the team stats for every game
+######################################
+team_game_stats = pd.DataFrame()
+
+for i in range(len(games)):
+    url = games.iloc[i]['boxscore_link']
+    r1 = requests.get(url)
+    coverpage = r1.content
+    soup2 = BeautifulSoup(coverpage, 'html.parser')
+    section = soup2.find_all('div', class_="content desktop")
+    team_stats = soup2.find_all('tr', class_="highlight")
+    pass_team = []
+    pass_comp = []
+    pass_att = []
+    pass_yds = []
+    pass_td = []
+    rush_team = []
+    rush_car = []
+    rush_yds = []
+    rush_td = []
+    fmbls_team = []
+    fmbls_fum = []
+    fmbls_lost = []
+    fmbls_rec = []
+    def_team = []
+    def_sacks = []
+    def_tfl = []
+    def_td = []
+    int_team = []
+    int_int = []
+    int_td = []
+    kr_team = []
+    kr_no = []
+    kr_yds = []
+    kr_td = []
+    pr_team = []
+    pr_no = []
+    pr_yds = []
+    pr_td = []
+    fg_team = []
+    fg_make = []
+    fg_att = []
+    fg_xpmake = []
+    fg_xpatt = []
+    punt_team = []
+    punt_no = []
+    punt_yds = []
+    punt_tb = []
+    punt_in20 = []
+    counter = 0
+    #
+    for j in range(len(section)):
+        k = j - counter
+        # team passing stats
+        if 'Passing' in section[j].find_all('div', class_= "team-name")[0].get_text():
+            pass_team.append(section[j].find_all('div', class_= "team-name")[0].get_text().split(' ' + 'Passing')[0])
+            if 'No ' + section[j].find_all('div', class_= "team-name")[0].get_text() in section[j].get_text():
+                pass_comp.append('0')
+                pass_att.append('0')
+                pass_yds.append('0')
+                pass_td.append('0')
+                counter = counter + 1
+            else:
+                pass_comp.append(team_stats[k].find_all('td', class_= "c-att")[0].get_text().split('/')[0])
+                pass_att.append(team_stats[k].find_all('td', class_= "c-att")[0].get_text().split('/')[1])
+                pass_yds.append(team_stats[k].find_all('td', class_= "yds")[0].get_text())
+                pass_td.append(team_stats[k].find_all('td', class_= "td")[0].get_text())
+        # team rushing stats
+        elif 'Rushing' in section[j].find_all('div', class_= "team-name")[0].get_text():
+            rush_team.append(section[j].find_all('div', class_= "team-name")[0].get_text().split(' ' + 'Rushing')[0])
+            if 'No ' + section[j].find_all('div', class_= "team-name")[0].get_text() in section[j].get_text():
+                rush_car.append('0')
+                rush_yds.append('0')
+                rush_td.append('0')
+                counter = counter + 1
+            else:
+                rush_car.append(team_stats[k].find_all('td', class_= "car")[0].get_text())
+                rush_yds.append(team_stats[k].find_all('td', class_= "yds")[0].get_text())
+                rush_td.append(team_stats[k].find_all('td', class_= "td")[0].get_text())
+        # team fumble stats
+        elif 'Fumbles' in section[j].find_all('div', class_= "team-name")[0].get_text():
+            fmbls_team.append(section[j].find_all('div', class_= "team-name")[0].get_text().split(' ' + 'Fumbles')[0])
+            if 'No ' + section[j].find_all('div', class_= "team-name")[0].get_text() in section[j].get_text():
+                fmbls_fum.append('0')
+                fmbls_lost.append('0')
+                fmbls_rec.append('0')
+                counter = counter + 1
+            else:
+                fmbls_fum.append(team_stats[k].find_all('td', class_= "fum")[0].get_text())
+                fmbls_lost.append(team_stats[k].find_all('td', class_= "lost")[0].get_text())
+                fmbls_rec.append(team_stats[k].find_all('td', class_= "rec")[0].get_text())
+        # team defensive stats
+        elif 'Defens' in section[j].find_all('div', class_= "team-name")[0].get_text():
+            def_team.append(section[j].find_all('div', class_= "team-name")[0].get_text().split(' ' + 'Defens')[0])
+            if 'No ' + section[j].find_all('div', class_= "team-name")[0].get_text() in section[j].get_text():
+                def_sacks.append('0')
+                def_tfl.append('0')
+                def_td.append('0')
+                counter = counter + 1
+            else:
+                def_sacks.append(team_stats[k].find_all('td', class_= "sacks")[0].get_text())
+                def_tfl.append(team_stats[k].find_all('td', class_= "tfl")[0].get_text())
+                def_td.append(team_stats[k].find_all('td', class_= "td")[0].get_text())
+        # team interception stats
+        elif 'Interce' in section[j].find_all('div', class_= "team-name")[0].get_text():
+            int_team.append(section[j].find_all('div', class_= "team-name")[0].get_text().split(' ' + 'Interce')[0])
+            if 'No ' + section[j].find_all('div', class_= "team-name")[0].get_text() in section[j].get_text():
+                int_int.append('0')
+                int_td.append('0')
+                counter = counter + 1
+            else:
+                int_int.append(team_stats[k].find_all('td', class_= "int")[0].get_text())
+                int_td.append(team_stats[k].find_all('td', class_= "td")[0].get_text())
+        # team kick return stats
+        elif 'Kick Returns' in section[j].find_all('div', class_= "team-name")[0].get_text():
+            kr_team.append(section[j].find_all('div', class_= "team-name")[0].get_text().split(' ' + 'Kick Returns')[0])
+            if 'No ' + section[j].find_all('div', class_= "team-name")[0].get_text() in section[j].get_text():
+                kr_no.append('0')
+                kr_yds.append('0')
+                kr_td.append('0')
+                counter = counter + 1
+            else:
+                kr_no.append(team_stats[k].find_all('td', class_= "no")[0].get_text())
+                kr_yds.append(team_stats[k].find_all('td', class_= "yds")[0].get_text())
+                kr_td.append(team_stats[k].find_all('td', class_= "td")[0].get_text())
+        # punt return stats
+        elif 'Punt Returns' in section[j].find_all('div', class_= "team-name")[0].get_text():
+            pr_team.append(section[j].find_all('div', class_= "team-name")[0].get_text().split(' ' + 'Punt Returns')[0])
+            if 'No ' + section[j].find_all('div', class_= "team-name")[0].get_text() in section[j].get_text():
+                pr_no.append('0')
+                pr_yds.append('0')
+                pr_td.append('0')
+                counter = counter + 1
+            else:
+                pr_no.append(team_stats[k].find_all('td', class_= "no")[0].get_text())
+                pr_yds.append(team_stats[k].find_all('td', class_= "yds")[0].get_text())
+                pr_td.append(team_stats[k].find_all('td', class_= "td")[0].get_text())
+        # kicking stats
+        elif 'Kicking' in section[j].find_all('div', class_= "team-name")[0].get_text():
+            fg_team.append(section[j].find_all('div', class_= "team-name")[0].get_text().split(' ' + 'Kicking')[0])
+            if 'No ' + section[j].find_all('div', class_= "team-name")[0].get_text() in section[j].get_text():
+                fg_make.append('0')
+                fg_att.append('0')
+                fg_xpmake.append('0')
+                fg_xpatt.append('0')
+                counter = counter + 1
+            else:
+                fg_make.append(team_stats[k].find_all('td', class_= "fg")[0].get_text().split("/")[0])
+                fg_att.append(team_stats[k].find_all('td', class_= "fg")[0].get_text().split("/")[1])
+                fg_xpmake.append(team_stats[k].find_all('td', class_= "xp")[0].get_text().split("/")[0])
+                fg_xpatt.append(team_stats[k].find_all('td', class_= "xp")[0].get_text().split("/")[1])
+        # punting stats
+        elif 'Punting' in section[j].find_all('div', class_= "team-name")[0].get_text():
+            punt_team.append(section[j].find_all('div', class_= "team-name")[0].get_text().split(' ' + 'Punting')[0])
+            if 'No ' + section[j].find_all('div', class_= "team-name")[0].get_text() in section[j].get_text():
+                punt_no.append('0')
+                punt_yds.append('0')
+                punt_tb.append('0')
+                punt_in20.append('0')
+                counter = counter + 1
+            else:
+                punt_no.append(team_stats[k].find_all('td', class_= "no")[0].get_text())
+                punt_yds.append(team_stats[k].find_all('td', class_= "yds")[0].get_text())
+                punt_tb.append(team_stats[k].find_all('td', class_= "tb")[0].get_text())
+                punt_in20.append(team_stats[k].find_all('td', class_= "in 20")[0].get_text())
+    #
+    passing = pd.DataFrame({'team':pass_team,
+                            'pass_comp':pass_comp,
+                            'pass_att': pass_att,
+                            'pass_yds':pass_yds,
+                            'pass_td':pass_td})
+    rush = pd.DataFrame({'team':rush_team,
+                         'rush_car':rush_car,
+                         'rush_yds':rush_yds,
+                         'rush_td':rush_td})
+    fmbls = pd.DataFrame({'team':fmbls_team,
+                          'fmbls_fum':fmbls_fum,
+                          'fmbls_lost':fmbls_lost,
+                          'fmbls_rec':fmbls_rec})
+    defense = pd.DataFrame({'team':def_team,
+                            'def_sacks':def_sacks,
+                            'def_tfl':def_tfl,
+                            'def_td':def_td})
+    interceptions = pd.DataFrame({'team':int_team,
+                                  'int_int':int_int,
+                                  'int_td':int_td})
+    kr = pd.DataFrame({'team':kr_team,
+                       'kr_no':kr_no,
+                       'kr_yds':kr_yds,
+                       'kr_td':kr_td})
+    pr = pd.DataFrame({'team':pr_team,
+                       'pr_no':pr_no,
+                       'pr_yds':pr_yds,
+                       'pr_td':pr_td})
+    fg = pd.DataFrame({'team':fg_team,
+                       'fg_make':fg_make,
+                       'fg_att':fg_att,
+                       'xp_make':fg_xpmake,
+                       'xp_att':fg_xpatt})
+    punt = pd.DataFrame({'team':punt_team,
+                         'punt_no':punt_no,
+                         'punt_yds':punt_yds,
+                         'punt_tb':punt_tb,
+                         'punt_in20':punt_in20})
+    #
+    df0 = pd.merge(passing, rush, on = 'team', how = 'inner')
+    df1 = pd.merge(df0, fmbls, on = 'team', how = 'inner')
+    df2 = pd.merge(df1, defense, on = 'team', how = 'inner')
+    df3 = pd.merge(df2, interceptions, on = 'team', how = 'inner')
+    df4 = pd.merge(df3, kr, on = 'team', how = 'inner')
+    df5 = pd.merge(df4, pr, on = 'team', how = 'inner')
+    df6 = pd.merge(df5, fg, on = 'team', how = 'inner')
+    df = pd.merge(df6, punt, on = 'team', how = 'inner')
+    df['game_id'] = games.iloc[i]['game_id']
+    team_game_stats = team_game_stats.append(df)
+    print(str(i) + ' out of ' + str(len(games)) + ': ' + pass_team[0] + ' vs. ' + pass_team[1])
+
+
+# ------------------------------------------------------------------------------
+# Write dataframes to private S3 bucket
+# To update or rotate security keys, go to aws > my security credentials > users > add new key
+# ------------------------------------------------------------------------------
+access_key = 'AKIAUL755PNF3ME6OYUO'
+secret_key = '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'
+
+fs = s3fs.S3FileSystem(key = access_key,
+                       secret = secret_key,
+                       use_ssl = True,
+                       s3_additional_kwargs = {'ServerSideEncryption': 'AES256'})
+
+
+bytes_to_writeg = games.to_csv(None, index = None, header = True).encode()
+with fs.open('s3://b-shelton-sports/cfb_games.csv', 'wb') as f:
+    f.write(bytes_to_writeg)
+
+bytes_to_writeo = opponents.to_csv(None, index = None, header = True).encode()
+with fs.open('s3://b-shelton-sports/cfb_opponents.csv', 'wb') as f:
+    f.write(bytes_to_writeo)
+
+bytes_to_writes = team_game_stats.to_csv(None, index = None, header = True).encode()
+with fs.open('s3://b-shelton-sports/cfb_gamestats.csv', 'wb') as f:
+    f.write(bytes_to_writes)
+
+bytes_to_writep = plays.to_csv(None, index = None, header = True).encode()
+with fs.open('s3://b-shelton-sports/cfb_plays.csv', 'wb') as f:
+    f.write(bytes_to_writep)
