@@ -91,6 +91,10 @@ for a in ['2006', '2007', '2008', '2009', '2010', '2011', '2012',
                 team_id = d['events'][k]['competitions'][0]['competitors'][i]['team']['id']
                 team = d['events'][k]['competitions'][0]['competitors'][i]['team']['location']
                 team_abbr = d['events'][k]['competitions'][0]['competitors'][i]['team']['abbreviation']
+                try:
+                  conf_id = d['events'][k]['competitions'][0]['competitors'][i]['team']['conferenceId']
+                except:
+                  conf_id = np.NaN
                 home_away = d['events'][k]['competitions'][0]['competitors'][i]['homeAway']
                 # in the event that a game is postponed, there may not be a winner or scores populated.
                 try:
@@ -122,6 +126,7 @@ for a in ['2006', '2007', '2008', '2009', '2010', '2011', '2012',
                             'team_id':team_id,
                             'team': team,
                             'team_abbr':team_abbr,
+                            'conf_id':conf_id,
                             'home_away':home_away,
                             'winner':winner,
                             'final_points':final_points,
@@ -138,11 +143,28 @@ games = pd.DataFrame(games)
 opponents = pd.DataFrame(opponents)
 
 
+# Get the conference names for the conference ids
+url = 'https://www.espn.com/college-football/teams'
+r1 = requests.get(url)
+coverpage = r1.content
+soup = BeautifulSoup(coverpage, 'html.parser')
+confs = soup.find_all('option', class_="dropdown__option")
+conf_id = []
+conf_name = []
+for i in range(len(confs)):
+  conf_id.append(confs[i]['value'])
+  conf_name.append(confs[i].get_text().replace(' ', '_'))
+
+conferences = pd.DataFrame({'conf_id':conf_id, 'conf_name':conf_name})
+
+
+
 if games['game_id'].drop_duplicates().shape[0] == games.shape[0]:
     # write the games and opponents data out to s3
     os.system('mkdir /home/ec2-user/tmp')
     games.to_csv('/home/ec2-user/tmp/games.gz', compression = 'gzip', index = None, header = True)
     opponents.to_csv('/home/ec2-user/tmp/opponents.gz', compression = 'gzip', index = None, header = True)
+    conferences.to_csv('/home/ec2-user/tmp/conferences.gz', compression = 'gzip', index = None, header = True)
     os.system('aws s3 sync /home/ec2-user/tmp s3://b-shelton-sports')
     os.system('rm -r /home/ec2-user/tmp')
     print('games and opponents written to s3.')

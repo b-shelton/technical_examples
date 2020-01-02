@@ -1,3 +1,5 @@
+# eda and etl for ml
+
 import os
 import pandas as pd
 import numpy as np
@@ -7,6 +9,7 @@ os.system('mkdir /home/ec2-user/tmp')
 os.system('aws s3 sync s3://b-shelton-sports /home/ec2-user/tmp')
 games = pd.read_csv('/home/ec2-user/tmp/games.gz')
 opponents = pd.read_csv('/home/ec2-user/tmp/opponents.gz')
+conferences = pd.read_csv('/home/ec2-user/tmp/conferences.gz')
 box = pd.read_csv('/home/ec2-user/tmp/team_game_stats.gz')
 os.system('rm -r /home/ec2-user/tmp')
 
@@ -111,61 +114,113 @@ for i in ['conference_comp', 'completed']:
   print('\n')
 
 
-
+################################################################################
 ################################################################################
 # Transform the data
 # For home team, create the 6 month fields for them and their opponents
+################################################################################
 ################################################################################
 
 # get rid of the games not completed
 gobc = gob[gob['completed'] == True]
 
-# add y label
-gobc['ylabel'] = np.where(gobc['winner'] == True, 1, 0)
+# add the conference names (manually imputing based on research)
+gobc = gobc.merge(conferences, on = 'conf_id', how = 'left')
+gobc['conf_name'] = np.where(gobc['conf_name'].isnull(), 
+                             np.where(gobc['conf_id'] == 16, 
+                                      'WAC', 
+                                      np.where(gobc['conf_id'] == 10, 
+                                               'Big_East',
+                                               'FCS')),
+                             gobc['conf_name'])
+
 # sort rows by team and date
 gobc = gobc.sort_values(by = ['team_id', 'date'], ascending = True).reset_index(drop = True)
 
-# game info for the home team
-p1 = gobc[gobc['home_away'] == 'home'][['ylabel', 'team_id', 'team', 'winner', 'conference_comp',
-                                      'neutral_site', 'attendance', 'game_id', 'date']]
+# add y label
+gobc['ylabel'] = np.where(gobc['winner'] == True, 1, 0)
 
-# get the opponents for every home team
-opponents = gobc[gobc['home_away'] == 'away'][['game_id', 'team_id']]
-opponents.rename(columns = {'team_id':'opp_id'}, inplace = True)
-p1 = pd.merge(p1, opponents, on = 'game_id', how = 'inner')
+# add conference competition identifier
+gobc['conf_play'] = np.where(gobc['conference_comp'] == True, 1, 0)
+
 
 # get the stats from the last 6 games for the team
-gobc['p6_pts'] = gobc.groupby(['team_id']).shift(1).rolling(6).final_points.sum()
-gobc['p6_passcomp'] = gobc.groupby(['team_id']).shift(1).rolling(6).pass_comp.sum()
-gobc['p6_passatt'] = gobc.groupby(['team_id']).shift(1).rolling(6).pass_att.sum()
-gobc['p6_passyds'] = gobc.groupby(['team_id']).shift(1).rolling(6).pass_yds.sum()
-gobc['p6_passtd'] = gobc.groupby(['team_id']).shift(1).rolling(6).pass_td.sum()
-gobc['p6_rushcar'] = gobc.groupby(['team_id']).shift(1).rolling(6).rush_car.sum()
-gobc['p6_rushyds'] = gobc.groupby(['team_id']).shift(1).rolling(6).rush_yds.sum()
-gobc['p6_rushtd'] = gobc.groupby(['team_id']).shift(1).rolling(6).rush_td.sum()
-gobc['p6_intint'] = gobc.groupby(['team_id']).shift(1).rolling(6).int_int.sum()
-gobc['p6_inttd'] = gobc.groupby(['team_id']).shift(1).rolling(6).int_td.sum()
-gobc['p6_krno'] = gobc.groupby(['team_id']).shift(1).rolling(6).kr_no.sum()
-gobc['p6_kryds'] = gobc.groupby(['team_id']).shift(1).rolling(6).kr_yds.sum()
-gobc['p6_prno'] = gobc.groupby(['team_id']).shift(1).rolling(6).pr_no.sum()
-gobc['p6_pryds'] = gobc.groupby(['team_id']).shift(1).rolling(6).pr_yds.sum()
-gobc['p6_prtd'] = gobc.groupby(['team_id']).shift(1).rolling(6).pr_td.sum()
-gobc['p6_fgmake'] = gobc.groupby(['team_id']).shift(1).rolling(6).fg_make.sum()
-gobc['p6_fgatt'] = gobc.groupby(['team_id']).shift(1).rolling(6).fg_att.sum()
-gobc['p6_xpmake'] = gobc.groupby(['team_id']).shift(1).rolling(6).xp_make.sum()
-gobc['p6_xpatt'] = gobc.groupby(['team_id']).shift(1).rolling(6).xp_att.sum()
-gobc['p6_puntno'] = gobc.groupby(['team_id']).shift(1).rolling(6).punt_no.sum()
-gobc['p6_puntyds'] = gobc.groupby(['team_id']).shift(1).rolling(6).punt_yds.sum()
-gobc['p6_punttb'] = gobc.groupby(['team_id']).shift(1).rolling(6).punt_tb.sum()
-gobc['p6_puntin20'] = gobc.groupby(['team_id']).shift(1).rolling(6).punt_in20.sum()
+# win_pct: win percentage over the last 6 games
+# pts: how many points the team scored over the last 6 games
+# top_25: the number of weeks ranked in the top 25 over the last 6 games
+# top_10: the number of weeks ranked in the top 10 over the last 6 weeks
+# vs_game_pts: how many points the opposing teams scored in the head-to-head game
+# vs_pts: how many points the opposing teams scored over the last 6 games
+# vs_win_pct: combined win percentage over the last 6 games for opponents
+# avg_ptdiff: the average point differential between the team and their opponents over the last 6 games
 
-t6 = pd.concat([gobc[['team_id', 'date']], gobc[[col for col in gobc  if col.startswith('p6')]]], axis = 1)
-p1 = p1.merge(t6, how = 'left', on = ['team_id', 'date'])
+# win_pct
+gobc['win_pct'] = gobc.groupby(['team_id']).shift(1).rolling(6).ylabel.mean()
 
-# get the stats from the last 6 games for the team's opponent
-t6.columns = ['opp_' + str(col) for col in t6.columns]
-t6.rename(columns = {'opp_team_id':'opp_id', 'opp_date':'date'}, inplace = True)
-p1 = p1.merge(t6, how = 'left', on = ['opp_id', 'date'])
+# pts
+gobc['pts'] = gobc.groupby(['team_id']).shift(1).rolling(6).final_points.sum()
+
+# top_25
+gobc['t25_id'] = np.where(gobc['rank'] <= 25, 1, 0)
+gobc['top_25'] = gobc.groupby(['team_id']).shift(1).rolling(6).t25_id.sum()
+
+# top_10
+gobc['t10_id'] = np.where(gobc['rank'] <= 10, 1, 0)
+gobc['top_10'] = gobc.groupby(['team_id']).shift(1).rolling(6).t10_id.sum()
+
+# vs_pts, vs_win_pct, avg_ptdiff etl
+g2 = gobc.sort_values(by = 'game_id')
+g2['vs_id1'] = g2.groupby(['game_id'])['team_id'].shift(-1)
+g2['vs_team1'] = g2.groupby(['game_id'])['team'].shift(-1)
+g2['vs_pts1'] = g2.groupby(['game_id'])['final_points'].shift(-1)
+g2['vs_win_pct1'] = g2.groupby(['game_id'])['win_pct'].shift(-1)
+g2['vs_id2'] = g2.groupby(['game_id'])['team_id'].shift(1)
+g2['vs_team2'] = g2.groupby(['game_id'])['team'].shift(1)
+g2['vs_pts2'] = g2.groupby(['game_id'])['final_points'].shift(1)
+g2['vs_win_pct2'] = g2.groupby(['game_id'])['win_pct'].shift(1)
+g2['vs_id'] = np.where(g2['vs_id1'].isnull(), g2['vs_id2'], g2['vs_id1'])
+g2['vs_team'] = np.where(g2['vs_team1'].isnull(), g2['vs_team2'], g2['vs_team1'])
+g2['vs_game_pts'] = np.where(g2['vs_pts1'].isnull(), g2['vs_pts2'], g2['vs_pts1'])
+g2['vs_win_pcta'] = np.where(g2['vs_win_pct1'].isnull(), np.where(g2['vs_win_pct2'].isnull(), 0, g2['vs_win_pct2']), g2['vs_win_pct1'])
+g2 = g2[['game_id', 'team_id', 'vs_id', 'vs_team', 'vs_game_pts', 'vs_win_pcta']]
+gobc = gobc.merge(g2, on = ['game_id', 'team_id'], how = 'inner')
+
+# vs_pts
+gobc['vs_pts'] = gobc.groupby(['team_id']).shift(1).rolling(6).vs_game_pts.sum()
+
+# vs_win_pct
+gobc['vs_win_pct'] = gobc.groupby(['team_id']).shift(1).rolling(6).vs_win_pcta.mean()
+gobc['vs_win_pct'] = np.where(gobc['vs_win_pct'].shift(6).isnull(), np.NaN, gobc['vs_win_pct'])
+
+# avg_ptdiff
+gobc['ptdiff'] = gobc['final_points'] - gobc['vs_game_pts']
+gobc['avg_ptdiff'] = gobc.groupby(['team_id']).shift(1).rolling(6).ptdiff.mean()
+
+
+home = gobc[gobc['home_away'] == 'home']
+
+away = gobc[gobc['home_away'] == 'away'][['game_id', 'team_id', 'top_25', 'top_10', 'pts', 'vs_pts', 
+                                          'win_pct', 'vs_win_pct', 'avg_ptdiff', 'conf_name']]
+                                          
+away.rename(columns = {'team_id':'vs_team_id', 'top_25':'opp_top_25', 'top_10': 'opp_top_10', 
+                       'pts':'opp_pts', 'vs_pts': 'opp_vs_pts', 'win_pct':'opp_win_pct', 
+                       'vs_win_pct':'opp_vs_win_pct', 'avg_ptdiff':'opp_avg_ptdiff', 'conf_name':'opp_conf_name'}, inplace = True)
+                       
+final = home.merge(away, on = 'game_id', how = 'inner')
+
+final = final[final['pts'].notnull()][['game_id', 'date', 'ylabel', 'team_id', 'team', 'vs_team_id', 'vs_team', 'conf_play',
+                                       'final_points', 'vs_game_pts', 'ptdiff', 'pts', 'opp_pts', 'vs_pts', 'opp_vs_pts', 
+                                       'avg_ptdiff', 'opp_avg_ptdiff', 'top_25', 'opp_top_25', 'top_10', 'opp_top_10',
+                                       'conf_name', 'opp_conf_name']]
+final['game_id'] = final['game_id'].astype(str)                                       
+final['team_id'] = final['team_id'].astype(str)
+final.head(30)
+
+
+
+final[final['opp_pts'].isnull()].groupby('opp_conf_name').count()
+final[(final['opp_pts'].isnull()) & (final.opp_conf_name != 'FCS')].groupby('date').count()
+final[(final['opp_pts'].isnull()) & (final.date > '2006-12-17T19:30Z') & (final.opp_conf_name != 'FCS')]
 
 # write out ml data to s3
 os.system('mkdir /home/ec2-user/tmp')
