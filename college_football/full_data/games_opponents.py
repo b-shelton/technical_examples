@@ -156,3 +156,43 @@ else:
 # os.system('aws s3 sync s3://b-shelton-sports /home/ec2-user/tmp')
 # games = pd.read_csv('/home/ec2-user/tmp/games.gz')
 # opponents = pd.read_csv('/home/ec2-user/tmp/opponents.gz')
+
+# Get the play-by-play for every game
+# plays = []
+# for i in range(games.shape[0]):
+#   print(i)
+#   url = games.iloc[i]['pbp_link']
+#   r1 = requests.get(url)
+#   coverpage = r1.content
+#   soup2 = BeautifulSoup(coverpage, 'html.parser')
+#   pbp = soup2.find_all('li', ['', 'h3'])
+#   for j in range(len(pbp)):
+#     # no need to bring back data on end of quarters or game
+#     if "End of" not in pbp[j].get_text():
+#       #
+#       play = pbp[j].get_text()
+#       # get the down and field position
+#       d_fp = play.split('\n', 1)[1]
+#       if d_fp[4:5] == '&':
+#         d_fp = d_fp.split('\n', 1)[0]
+#       else:
+#         d_fp = ''
+#       #
+#       # get the play
+#       action = '(' + play.split('\t(', 1)[1]
+#       action = action.split('\n', 1)[0]
+#       #
+#       play = {'game_id':games.iloc[i]['game_id'], 'd_fp':d_fp, 'play':action}
+#       plays.append(play)
+#
+# plays = pd.DataFrame(plays)
+#
+# for i in ['2006', '2007', '2008', '2009', '2010', '2011', '2012',
+#           '2013', '2014', '2015', '2016', '2017', '2018', '2019']:
+#   t = games[games['year'] == i]
+#   i
+#   t['game_id'].drop_duplicates().shape[0] == t.shape[0]
+#   t['game_id'].drop_duplicates().shape[0]
+#   t.shape[0]
+#
+# games.groupby('game_id').count(['start_date']).sort_values(col)
