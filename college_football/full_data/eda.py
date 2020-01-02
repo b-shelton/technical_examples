@@ -79,7 +79,7 @@ pd.crosstab(gob.year, gob.empties)
 def num_desc(column_like):
   return gob[gob.columns[gob.columns.str.contains(column_like)]].describe()
 
-for i in ['points', 'pass_', 'rush_', 'fmbls_', 'def_',
+for i in ['attendance', 'points', 'pass_', 'rush_', 'fmbls_', 'def_',
           'int_', 'kr_', 'pr_', 'fg_', 'xp_', 'punt_']:
   print(i)
   print(num_desc(i))
@@ -126,7 +126,7 @@ gobc['ylabel'] = np.where(gobc['winner'] == True, 1, 0)
 gobc = gobc.sort_values(by = ['team_id', 'date'], ascending = True).reset_index(drop = True)
 
 # game info for the home team
-p1 = gobc[gobc['home_away'] == 'home'][['label', 'team_id', 'team', 'winner', 'conference_comp',
+p1 = gobc[gobc['home_away'] == 'home'][['ylabel', 'team_id', 'team', 'winner', 'conference_comp',
                                       'neutral_site', 'attendance', 'game_id', 'date']]
 
 # get the opponents for every home team
@@ -135,82 +135,37 @@ opponents.rename(columns = {'team_id':'opp_id'}, inplace = True)
 p1 = pd.merge(p1, opponents, on = 'game_id', how = 'inner')
 
 # get the stats from the last 6 games for the team
-def summer(column_name):
-    value_sums = []
-    for i in range(len(p1)):
-        f = gobc.index[(gobc['team_id'] == p1.iloc[i]['team_id']) & (gobc['date'] == p1.iloc[i]['date'])].tolist()[0]
-        if gobc.iloc[f]['team_id'] != gobc.iloc[(f-6)]['team_id']:
-            value_sums.append(np.NaN)
-        else:
-            g = gobc.iloc[(f-6):f][column_name].sum()
-            value_sums.append(g)
-    return value_sums
+gobc['p6_pts'] = gobc.groupby(['team_id']).shift(1).rolling(6).final_points.sum()
+gobc['p6_passcomp'] = gobc.groupby(['team_id']).shift(1).rolling(6).pass_comp.sum()
+gobc['p6_passatt'] = gobc.groupby(['team_id']).shift(1).rolling(6).pass_att.sum()
+gobc['p6_passyds'] = gobc.groupby(['team_id']).shift(1).rolling(6).pass_yds.sum()
+gobc['p6_passtd'] = gobc.groupby(['team_id']).shift(1).rolling(6).pass_td.sum()
+gobc['p6_rushcar'] = gobc.groupby(['team_id']).shift(1).rolling(6).rush_car.sum()
+gobc['p6_rushyds'] = gobc.groupby(['team_id']).shift(1).rolling(6).rush_yds.sum()
+gobc['p6_rushtd'] = gobc.groupby(['team_id']).shift(1).rolling(6).rush_td.sum()
+gobc['p6_intint'] = gobc.groupby(['team_id']).shift(1).rolling(6).int_int.sum()
+gobc['p6_inttd'] = gobc.groupby(['team_id']).shift(1).rolling(6).int_td.sum()
+gobc['p6_krno'] = gobc.groupby(['team_id']).shift(1).rolling(6).kr_no.sum()
+gobc['p6_kryds'] = gobc.groupby(['team_id']).shift(1).rolling(6).kr_yds.sum()
+gobc['p6_prno'] = gobc.groupby(['team_id']).shift(1).rolling(6).pr_no.sum()
+gobc['p6_pryds'] = gobc.groupby(['team_id']).shift(1).rolling(6).pr_yds.sum()
+gobc['p6_prtd'] = gobc.groupby(['team_id']).shift(1).rolling(6).pr_td.sum()
+gobc['p6_fgmake'] = gobc.groupby(['team_id']).shift(1).rolling(6).fg_make.sum()
+gobc['p6_fgatt'] = gobc.groupby(['team_id']).shift(1).rolling(6).fg_att.sum()
+gobc['p6_xpmake'] = gobc.groupby(['team_id']).shift(1).rolling(6).xp_make.sum()
+gobc['p6_xpatt'] = gobc.groupby(['team_id']).shift(1).rolling(6).xp_att.sum()
+gobc['p6_puntno'] = gobc.groupby(['team_id']).shift(1).rolling(6).punt_no.sum()
+gobc['p6_puntyds'] = gobc.groupby(['team_id']).shift(1).rolling(6).punt_yds.sum()
+gobc['p6_punttb'] = gobc.groupby(['team_id']).shift(1).rolling(6).punt_tb.sum()
+gobc['p6_puntin20'] = gobc.groupby(['team_id']).shift(1).rolling(6).punt_in20.sum()
 
-p1['p6_pts'] = summer('final_points')
-p1 = p1[p1['p6_pts'].notnull()]
-p1['p6_passcomp'] = summer('pass_comp')
-p1['p6_passatt'] = summer('pass_att')
-p1['p6_passyds'] = summer('pass_yds')
-p1['p6_passtd'] = summer('pass_td')
-p1['p6_rushcar'] = summer('rush_car')
-p1['p6_rushyds'] = summer('rush_yds')
-p1['p6_rushtd'] = summer('rush_td')
-p1['p6_intint'] = summer('int_int')
-p1['p6_inttd'] = summer('int_td')
-p1['p6_krno'] = summer('kr_no')
-p1['p6_kryds'] = summer('kr_yds')
-p1['p6_krtd'] = summer('kr_td')
-p1['p6_prno'] = summer('pr_no')
-p1['p6_pryds'] = summer('pr_yds')
-p1['p6_prtd'] = summer('pr_td')
-p1['p6_fgmake'] = summer('fg_make')
-p1['p6_fgatt'] = summer('fg_att')
-p1['p6_xpmake'] = summer('xp_make')
-p1['p6_xpatt'] = summer('xp_att')
-p1['p6_puntno'] = summer('punt_no')
-p1['p6_puntyds'] = summer('punt_yds')
-p1['p6_punttb'] = summer('punt_tb')
-p1['p6_puntin20'] = summer('punt_in20')
+t6 = pd.concat([gobc[['team_id', 'date']], gobc[[col for col in gobc  if col.startswith('p6')]]], axis = 1)
+p1 = p1.merge(t6, how = 'left', on = ['team_id', 'date'])
 
-
-# get the stats from the last 6 games for the opponent
-def opp_summer(column_name):
-    value_sums = []
-    for i in range(len(p1)):
-        f = gobc.index[(gobc['team_id'] == p1.iloc[i]['opp_id']) & (gobc['date'] == p1.iloc[i]['date'])].tolist()[0]
-        if gobc.iloc[f]['team_id'] != gobc.iloc[(f-6)]['team_id']:
-            value_sums.append(np.NaN)
-        else:
-            g = gobc.iloc[(f-6):f][column_name].sum()
-            value_sums.append(g)
-    return value_sums
-
-p1['opp_p6_pts'] = opp_summer('final_points')
-p1['opp_p6_passcomp'] = opp_summer('pass_comp')
-p1['opp_p6_passatt'] = opp_summer('pass_att')
-p1['opp_p6_passyds'] = opp_summer('pass_yds')
-p1['opp_p6_passtd'] = opp_summer('pass_td')
-p1['opp_p6_rushcar'] = opp_summer('rush_car')
-p1['opp_p6_rushyds'] = opp_summer('rush_yds')
-p1['opp_p6_rushtd'] = opp_summer('rush_td')
-p1['opp_p6_intint'] = opp_summer('int_int')
-p1['opp_p6_inttd'] = opp_summer('int_td')
-p1['opp_p6_krno'] = opp_summer('kr_no')
-p1['opp_p6_kryds'] = opp_summer('kr_yds')
-p1['opp_p6_krtd'] = opp_summer('kr_td')
-p1['opp_p6_prno'] = opp_summer('pr_no')
-p1['opp_p6_pryds'] = opp_summer('pr_yds')
-p1['opp_p6_prtd'] = opp_summer('pr_td')
-p1['opp_p6_fgmake'] = opp_summer('fg_make')
-p1['opp_p6_fgatt'] = opp_summer('fg_att')
-p1['opp_p6_xpmake'] = opp_summer('xp_make')
-p1['opp_p6_xpatt'] = opp_summer('xp_att')
-p1['opp_p6_puntno'] = opp_summer('punt_no')
-p1['opp_p6_puntyds'] = opp_summer('punt_yds')
-p1['opp_p6_punttb'] = opp_summer('punt_tb')
-p1['opp_p6_puntin20'] = opp_summer('punt_in20')
-
-
+# get the stats from the last 6 games for the team's opponent
+t6.columns = ['opp_' + str(col) for col in t6.columns]
+t6.rename(columns = {'opp_team_id':'opp_id', 'opp_date':'date'}, inplace = True)
+p1 = p1.merge(t6, how = 'left', on = ['opp_id', 'date'])
 
 # write out ml data to s3
 os.system('mkdir /home/ec2-user/tmp')
