@@ -198,6 +198,7 @@ gobc['avg_ptdiff'] = gobc.groupby(['team_id']).shift(1).rolling(6).ptdiff.mean()
 
 
 home = gobc[gobc['home_away'] == 'home']
+home.rename(columns = {'final_points':'game_pts'}, inplace = True)
 
 away = gobc[gobc['home_away'] == 'away'][['game_id', 'team_id', 'top_25', 'top_10', 'pts', 'vs_pts', 
                                           'win_pct', 'vs_win_pct', 'avg_ptdiff', 'conf_name']]
@@ -209,11 +210,12 @@ away.rename(columns = {'team_id':'vs_team_id', 'top_25':'opp_top_25', 'top_10': 
 final = home.merge(away, on = 'game_id', how = 'inner')
 
 final = final[final['pts'].notnull()][['game_id', 'date', 'ylabel', 'team_id', 'team', 'vs_team_id', 'vs_team', 'conf_play',
-                                       'final_points', 'vs_game_pts', 'ptdiff', 'pts', 'opp_pts', 'vs_pts', 'opp_vs_pts', 
+                                       'game_pts', 'vs_game_pts', 'ptdiff', 'pts', 'opp_pts', 'vs_pts', 'opp_vs_pts', 
                                        'avg_ptdiff', 'opp_avg_ptdiff', 'top_25', 'opp_top_25', 'top_10', 'opp_top_10',
-                                       'conf_name', 'opp_conf_name']]
+                                       'conf_name', 'opp_conf_name', 'year']]
 final['game_id'] = final['game_id'].astype(str)                                       
-final['team_id'] = final['team_id'].astype(str)
+final['team_id'] = final['team_id'].astype(str)                                       
+final['vs_team_id'] = final['vs_team_id'].astype(str)
 final.head(30)
 
 
@@ -223,8 +225,192 @@ final[(final['opp_pts'].isnull()) & (final.opp_conf_name != 'FCS')].groupby('dat
 final[(final['opp_pts'].isnull()) & (final.date > '2006-12-17T19:30Z') & (final.opp_conf_name != 'FCS')]
 
 # write out ml data to s3
-os.system('mkdir /home/ec2-user/tmp')
-p1.to_csv('/home/ec2-user/tmp/ml_data.gz', compression = 'gzip', index = None, header = True)
-os.system('aws s3 sync /home/ec2-user/tmp s3://b-shelton-sports')
-os.system('rm -r /home/ec2-user/tmp')
-print('games and opponents written to s3.')
+# os.system('mkdir /home/ec2-user/tmp')
+# final.to_csv('/home/ec2-user/tmp/ml_data.gz', compression = 'gzip', index = None, header = True)
+# os.system('aws s3 sync /home/ec2-user/tmp s3://b-shelton-sports')
+# os.system('rm -r /home/ec2-user/tmp')
+# print('final written to s3.')
+
+
+
+################################################################################
+################################################################################
+# ML Training
+################################################################################
+################################################################################
+
+
+# Pre-Processing
+################################################################
+initSet = final[['ylabel', 'team_id', 'vs_team_id', 'conf_play', 'pts', 'opp_pts',
+                  'vs_pts', 'opp_vs_pts', 'avg_ptdiff', 'opp_avg_ptdiff', 'top_25',
+                  'opp_top_25', 'top_10', 'opp_top_10', 'conf_name', 'opp_conf_name', 'year']].reset_index(drop = True)
+
+                 
+# Check for null values
+null_count = initSet.isnull().sum()
+
+# Check for empty string values
+empty_string_count = (initSet.values == '').sum(axis = 0)
+
+# Check for med_provname_choice values
+unique_values = initSet.nunique()
+
+# Put the three above items together
+explore_initSet = pd.DataFrame({'null_count': null_count,
+                                'empty_string_count': empty_string_count,
+                                'unique_values': unique_values})\
+  .reset_index()\
+  .sort_values(by = ['empty_string_count', 'unique_values'], ascending = False)
+
+frequency_ratios = pd.DataFrame([])
+def keep_top2(column_name):
+    try:
+        f2 = initSet.groupby(column_name).size().reset_index()
+        f2.columns = ['value', 'count']
+        f3 = f2.nlargest(2, 'count')
+        f4 = pd.DataFrame({'index': [column_name], 'freqRatio': f3['count'].iloc[0]/f3['count'].iloc[1]})
+        return f4
+    except:
+        f4 = pd.DataFrame({'index': [column_name], 'freqRatio': np.nan})
+        return f4
+
+for i in initSet.columns:
+    f5 = keep_top2(i)
+    frequency_ratios = frequency_ratios.append(f5)
+
+# Merge the freqRatio with explore_df and print
+pd.merge(explore_initSet, frequency_ratios, on = 'index')\
+  .sort_values(by = ['null_count', 'empty_string_count', 'unique_values'], ascending = False)
+  
+
+# Split the data into train and test
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(initSet.drop('ylabel', axis = 1),
+                                                    initSet['ylabel'],
+                                                    test_size = 0.30,
+                                                    random_state = 42)      
+                                                    
+X_train = X_train.reset_index(drop = True); y_train = y_train.reset_index(drop = True)
+X_test = X_test.reset_index(drop = True); y_test = y_test.reset_index(drop = True)
+
+print('Training set shape = ' + str(X_train.shape))
+print('Testing set shape = ' + str(X_test.shape))
+
+# Impute missing data
+null_count = initSet.isnull().sum()
+# Validate that there are no more nulls
+print('Number of null values in training set = ' + str(X_train.isnull().sum().sum()))
+print('Number of null values in testing set = ' + str(X_test.isnull().sum().sum()))
+
+for i in null_count[null_count > 0].index:
+    # get the values from the training set only
+    fcs_replacements = X_train.groupby(['opp_conf_name'])[i].mean().reset_index()
+    fcs_replacements = fcs_replacements.rename(columns = {i: ('fcs_' + i)})
+    non_fcs_replacements = X_train.groupby(['vs_team_id', 'year'])[i].mean().reset_index()
+    non_fcs_replacements = non_fcs_replacements.rename(colX_umns = {i: ('non_fcs_' + i)})
+    # Apply to the training set
+    X_train = X_train.merge(fcs_replacements, on = 'opp_conf_name', how = 'left')
+    X_train = X_train.merge(non_fcs_replacements, on = ['vs_team_id', 'year'], how = 'left')
+    X_train[i] = np.where(X_train[i].notnull(), 
+                          X_train[i], 
+                          np.where(X_train['opp_conf_name'] == 'FCS', 
+                                   X_train[('fcs_'+i)], 
+                                   X_train[('non_fcs_'+i)]))
+    X_train = X_train.drop(('fcs_'+i), axis = 1); X_train = X_train.drop(('non_fcs_'+i), axis = 1)
+    # Apply to the testing set
+    X_test = X_test.merge(fcs_replacements, on = 'opp_conf_name', how = 'left')
+    X_test = X_test.merge(non_fcs_replacements, on = ['vs_team_id', 'year'], how = 'left')
+    X_test[i] = np.where(X_test[i].notnull(), 
+                         X_test[i], 
+                         np.where(X_test['opp_conf_name'] == 'FCS', 
+                                  X_test[('fcs_'+i)], 
+                                  X_test[('non_fcs_'+i)]))
+    X_test = X_test.drop(('fcs_'+i), axis = 1); X_test = X_test.drop(('non_fcs_'+i), axis = 1)
+
+# Validate that there are no more nulls
+print('Number of null values in training set = ' + str(X_train.isnull().sum().sum()))
+print('Number of null values in testing set = ' + str(X_test.isnull().sum().sum()))
+
+# After imputation, drop any remaining that still didn't get imputed.
+train_index_drop = X_train[X_train.isnull().any(axis=1)].index.tolist()
+for i in train_index_drop:
+    y_train = y_train.iloc[~y_train.index.isin(train_index_drop)]
+    X_train = X_train.iloc[~X_train.index.isin(train_index_drop)]
+
+test_index_drop = X_test[X_test.isnull().any(axis=1)].index.tolist()
+for i in test_index_drop:
+    y_test = y_test.iloc[~y_test.index.isin(test_index_drop)]
+    X_train = X_test.iloc[~X_test.index.isin(test_index_drop)]
+
+# Validate that there are no more nulls
+print('Number of null values in training set = ' + str(X_train.isnull().sum().sum()))
+print('Number of null values in testing set = ' + str(X_test.isnull().sum().sum()))
+X_train.shape; y_train.shape
+X_test.shape; y_test.shape
+
+
+# One-hot encode cateogircal variables (ensuring both the train and test sets only contain the one-hot encoded train fields)
+train_X = pd.get_dummies(X_train)
+test_X = pd.get_dummies(X_test)
+
+# Check to see if there are dummy variables in the train set that aren't in the test set,
+# and synthetically create the variables in the test set.
+missing_cols = set(train_X.columns) - set(test_X.columns)
+
+if len(missing_cols) == 0:
+    display('Train set does not contain any fields not included in test set.')
+else:
+    for i in missing_cols:
+        test_X[i] = 0
+        print(test_X[i].name + ' variable synthetically created in test set.')
+
+# Ensure that the test set does not have any dummy variables not included in the train set
+# and that the variables are in the same order.
+test_X = test_X[train_X.columns]
+
+print('One-hot encoded train set shape:')
+print(train_X.shape)
+
+print('One-hot encoded test set shape:')
+print(test_X.shape)
+
+
+
+# Baseline Random Forest Build
+################################################################
+from sklearn.ensemble import RandomForestClassifier
+
+with warnings.catch_warnings():
+    warnings.simplefilter(action = "ignore", category = DeprecationWarning)
+
+base_rf = RandomForestClassifier(n_estimators = 400,
+                                 bootstrap = True,
+                                 max_features = 'sqrt')
+
+base_rf.fit(train_X, y_train)
+
+# Predict on the test set
+rf_base_predictions = base_rf.predict(test_X)
+
+# Probabilities for each class
+rf_base_probs = base_rf.predict_proba(test_X)[:, 1]
+
+from sklearn.metrics import precision_score, recall_score, roc_auc_score, roc_curve
+baseline = {}
+baseline['recall'] = recall_score(y_test, rf_base_predictions)
+baseline['precision'] = precision_score(y_test, rf_base_predictions)
+baseline['roc'] = roc_auc_score(y_test, rf_base_probs)
+print(baseline)
+
+review = pd.DataFrame({'y':y_test, 'predicted_y':rf_base_predictions, 'predicted_probs':rf_base_probs})
+
+# ones that lost when model thought they would win
+loss_misses = review[(review['y'] == 0) & (review['predicted_y'] == 1)].sort_values(by = 'predicted_probs', ascending = False)
+
+def dig(x):
+    print(final[(final['team_id'] ==  X_test.iloc[x]['team_id']) & (final['vs_team_id'] == X_test.iloc[x]['vs_team_id']) & (final['year'] == X_test.iloc[x]['year'])])
+
+
+
