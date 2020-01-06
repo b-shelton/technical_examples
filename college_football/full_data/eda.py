@@ -3,6 +3,7 @@
 import os
 import pandas as pd
 import numpy as np
+from datetime import datetime, timezone
 
 # read all data from s3
 os.system('mkdir /home/ec2-user/tmp')
@@ -36,7 +37,8 @@ gob = pd.merge(ob, games[['game_id',
                           'neutral_site',
                           'date',
                           'week',
-                          'year']], on = 'game_id', how = 'left')
+                          'year',
+                          'game_type']], on = 'game_id', how = 'left')
 ob.shape[0] == gob.shape[0]
 
 
@@ -121,7 +123,9 @@ def cat_desc(column):
 ################################################################################
 
 # get rid of the games not completed
-gobc = gob[gob['completed'] == True]
+time_now = pd.to_datetime(datetime.now(timezone.utc))
+gob['future'] = np.where(pd.to_datetime(gob['date']) >= time_now, 1, 0)
+gobc = gob[(gob['completed'] == True) | (gob['future'] == 1)]
 
 # add the conference names (manually imputing based on research)
 gobc = gobc.merge(conferences, on = 'conf_id', how = 'left')
@@ -409,13 +413,22 @@ final = final[['ylabel', 'h_team_id', 'v_team_id', 'h_conf_name', 'v_conf_name',
                'v_passyds_st6', 'v_passtd_st6', 'v_passyds_at6', 'v_passtd_at6',
                'v_rushyds_st6', 'v_rushtd_st6', 'v_rushyds_at6', 'v_rushtd_at6',
                'v_int_st6', 'v_int_at6', 'v_top25_t6', 'v_top10_t6', 'v_top25_wat6', 'v_top10_wat6',
-               'v_top25_lat6', 'v_top10_lat6', 'year']]
+               'v_top25_lat6', 'v_top10_lat6', 'week', 'year', 'game_type', 'future']]
 
 final = final[final['h_pts_st6'].notnull()]
 final['h_team_id'] = final['h_team_id'].astype(str)
-final['v_team_id'] = final['v_team_id'].astype(str)
+final['v_team_id'] = final['v_team_id'].astype(int).astype(str)
 
 final.head(30)
+
+final[(final['h_team_id'] == '99') & (final['v_team_id'] == '228')]
+
+# remove future games
+future = final[final['future'] == 1].drop(['future', 'ylabel'], axis = 1)
+final['wk14'] = np.where((final['week'] == 14) & (final['year'] == 2019), 1, 0)
+future = final[final['wk14'] == 1]
+final = final[(final['future'] == 0) & (final['v_team_id'].notnull()) & (final['wk14'] == 0)].drop(['future', 'wk14'], axis = 1)
+
 
 # write out ml data to s3
 # os.system('mkdir /home/ec2-user/tmp')
@@ -488,12 +501,14 @@ X_test = X_test.reset_index(drop = True); y_test = y_test.reset_index(drop = Tru
 
 print('Training set shape = ' + str(X_train.shape))
 print('Testing set shape = ' + str(X_test.shape))
+print('Future set shape = ' + str(future.shape))
 
 # Impute missing data
 null_count = initSet.isnull().sum()
 # Validate that there are no more nulls
 print('Number of null values in training set = ' + str(X_train.isnull().sum().sum()))
 print('Number of null values in testing set = ' + str(X_test.isnull().sum().sum()))
+print('Number of null values in future set = ' + str(future.isnull().sum().sum()))
 
 for i in null_count[null_count > 0].index:
     # get the values from the training set only
@@ -519,35 +534,51 @@ for i in null_count[null_count > 0].index:
                                   X_test[('fcs_'+i)],
                                   X_test[('non_fcs_'+i)]))
     X_test = X_test.drop(('fcs_'+i), axis = 1); X_test = X_test.drop(('non_fcs_'+i), axis = 1)
+    # Apply to the future set
+    future = future.merge(fcs_replacements, on = 'v_conf_name', how = 'left')
+    future = future.merge(non_fcs_replacements, on = ['v_team_id', 'year'], how = 'left')
+    future[i] = np.where(future[i].notnull(),
+                         future[i],
+                         np.where(future['v_conf_name'] == 'FCS',
+                                  future[('fcs_'+i)],
+                                  future[('non_fcs_'+i)]))
+    future = future.drop(('fcs_'+i), axis = 1); future = future.drop(('non_fcs_'+i), axis = 1)
+
 
 # Validate that there are no more nulls
 print('Number of null values in training set = ' + str(X_train.isnull().sum().sum()))
 print('Number of null values in testing set = ' + str(X_test.isnull().sum().sum()))
+print('Number of null values in future set = ' + str(future.isnull().sum().sum()))
 
 # After imputation, drop any remaining that still didn't get imputed.
 train_index_drop = X_train[X_train.isnull().any(axis=1)].index.tolist()
-for i in train_index_drop:
-    y_train = y_train.iloc[~y_train.index.isin(train_index_drop)]
-    X_train = X_train.iloc[~X_train.index.isin(train_index_drop)]
+y_train = y_train.iloc[~y_train.index.isin(train_index_drop)]
+X_train = X_train.iloc[~X_train.index.isin(train_index_drop)]
 
 test_index_drop = X_test[X_test.isnull().any(axis=1)].index.tolist()
-for i in test_index_drop:
-    y_test = y_test.iloc[~y_test.index.isin(test_index_drop)]
-    X_train = X_test.iloc[~X_test.index.isin(test_index_drop)]
+y_test = y_test.iloc[~y_test.index.isin(test_index_drop)]
+X_test = X_test.iloc[~X_test.index.isin(test_index_drop)]
+
+future_index_drop = future[future.isnull().any(axis=1)].index.tolist()
+future = future.iloc[~future.index.isin(future_index_drop)]
 
 # Validate that there are no more nulls
 print('Number of null values in training set = ' + str(X_train.isnull().sum().sum()))
 print('Number of null values in testing set = ' + str(X_test.isnull().sum().sum()))
+print('Number of null values in future set = ' + str(future.isnull().sum().sum()))
 X_train.shape; y_train.shape
 X_test.shape; y_test.shape
+future.shape
 
 
 # One-hot encode cateogircal variables (ensuring both the train and test sets only contain the one-hot encoded train fields)
 train_X = pd.get_dummies(X_train)
 test_X = pd.get_dummies(X_test)
+future_X = pd.get_dummies(future)
 
 # Check to see if there are dummy variables in the train set that aren't in the test set,
 # and synthetically create the variables in the test set.
+# test set
 missing_cols = set(train_X.columns) - set(test_X.columns)
 
 if len(missing_cols) == 0:
@@ -561,11 +592,28 @@ else:
 # and that the variables are in the same order.
 test_X = test_X[train_X.columns]
 
+# future set
+missing_cols = set(train_X.columns) - set(future_X.columns)
+
+if len(missing_cols) == 0:
+    display('Train set does not contain any fields not included in test set.')
+else:
+    for i in missing_cols:
+        future_X[i] = 0
+        print(future_X[i].name + ' variable synthetically created in test set.')
+
+# Ensure that the test set does not have any dummy variables not included in the train set
+# and that the variables are in the same order.
+future_X = future_X[train_X.columns]
+
 print('One-hot encoded train set shape:')
 print(train_X.shape)
 
 print('One-hot encoded test set shape:')
 print(test_X.shape)
+
+print('One-hot encoded future set shape:')
+print(future_X.shape)
 
 
 
@@ -601,4 +649,55 @@ review = pd.DataFrame({'y':y_test, 'predicted_y':rf_base_predictions, 'predicted
 loss_misses = review[(review['y'] == 0) & (review['predicted_y'] == 1)].sort_values(by = 'predicted_probs', ascending = False)
 
 def dig(x):
-    print(final[(final['team_id'] ==  X_test.iloc[x]['team_id']) & (final['vs_team_id'] == X_test.iloc[x]['vs_team_id']) & (final['year'] == X_test.iloc[x]['year'])].index)
+    print(final[(final['h_team_id'] ==  X_test.iloc[x]['h_team_id']) & (final['v_team_id'] == X_test.iloc[x]['v_team_id']) & (final['year'] == X_test.iloc[x]['year'])].index)
+
+# test different conservative thresholds
+win_threshold = .8
+loss_threshold = .2
+conserv = review[(review['predicted_probs'] >= win_threshold) | (review['predicted_probs'] <= loss_threshold)]
+conserv_bl = {}
+conserv_bl['recall'] = recall_score(conserv['y'], conserv['predicted_y'])
+conserv_bl['precision'] = precision_score(conserv['y'], conserv['predicted_y'])
+conserv_bl['roc'] = roc_auc_score(conserv['y'], conserv['predicted_probs'])
+conserv.shape[0]
+print(conserv_bl)
+
+# test different middle-ground thresholds
+win_threshold = .65
+loss_threshold = .35
+mg = review[(review['predicted_probs'] <= win_threshold) & (review['predicted_probs'] >= loss_threshold)]
+mg_bl = {}
+mg_bl['recall'] = recall_score(mg['y'], mg['predicted_y'])
+mg_bl['precision'] = precision_score(mg['y'], mg['predicted_y'])
+mg_bl['roc'] = roc_auc_score(mg['y'], mg['predicted_probs'])
+mg.shape[0]
+print(mg_bl)
+
+
+# Predict on the test set
+rf_base_predictions = base_rf.predict(future_X)
+
+# Probabilities for each class
+rf_base_probs_future = base_rf.predict_proba(future_X)[:, 1]
+
+results = pd.DataFrame({'prediction':rf_base_probs_future})
+review2 = pd.concat([results, future], axis = 1)
+
+win_threshold = .8
+loss_threshold = .2
+review3 = review2[(review2['prediction'] >= win_threshold) | (review2['prediction'] <= loss_threshold)]
+
+def dig(x):
+    home = int(future.iloc[x]['h_team_id'])
+    away = int(future.iloc[x]['v_team_id'])
+    yearpoint = future.iloc[x]['year']
+    print(gobc[(gobc['h_team_id'] == home) & (gobc['v_team_id'] == away) & (gobc['year'] == yearpoint)])
+
+# ASU win -530 
+# FL win -900
+# LSU win -1000
+# PSU win -9000
+# Utah win -4000
+# Buff win -5000
+# UCF win -1600
+# Kansas loss +475
