@@ -13,6 +13,7 @@ python3 -m pip install requests
 python3 -m pip install bs4
 python3 -m pip install s3fs
 python3 -m pip install matplotlib
+python3 -m pip install sklearn
 
 # check drive usage
 df -H --output=source,size,used,avail
