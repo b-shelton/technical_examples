@@ -324,54 +324,6 @@ gobc['h_top10_lat6'] = gobc.groupby(['h_team_id']).shift(1).rolling(6).t10_losse
 
 # finish the visiting stats made from the last section
 g2 = gobc.sort_values(by = 'game_id')
-<<<<<<< HEAD
-g2['vs_id1'] = g2.groupby(['game_id'])['team_id'].shift(-1)
-g2['vs_team1'] = g2.groupby(['game_id'])['team'].shift(-1)
-g2['vs_pts1'] = g2.groupby(['game_id'])['final_points'].shift(-1)
-g2['vs_win_pct1'] = g2.groupby(['game_id'])['win_pct'].shift(-1)
-g2['vs_id2'] = g2.groupby(['game_id'])['team_id'].shift(1)
-g2['vs_team2'] = g2.groupby(['game_id'])['team'].shift(1)
-g2['vs_pts2'] = g2.groupby(['game_id'])['final_points'].shift(1)
-g2['vs_win_pct2'] = g2.groupby(['game_id'])['win_pct'].shift(1)
-g2['vs_id'] = np.where(g2['vs_id1'].isnull(), g2['vs_id2'], g2['vs_id1'])
-g2['vs_team'] = np.where(g2['vs_team1'].isnull(), g2['vs_team2'], g2['vs_team1'])
-g2['vs_game_pts'] = np.where(g2['vs_pts1'].isnull(), g2['vs_pts2'], g2['vs_pts1'])
-g2['vs_win_pcta'] = np.where(g2['vs_win_pct1'].isnull(), np.where(g2['vs_win_pct2'].isnull(), 0, g2['vs_win_pct2']), g2['vs_win_pct1'])
-g2 = g2[['game_id', 'team_id', 'vs_id', 'vs_team', 'vs_game_pts', 'vs_win_pcta']]
-gobc = gobc.merge(g2, on = ['game_id', 'team_id'], how = 'inner')
-
-# vs_pts
-gobc['vs_pts'] = gobc.groupby(['team_id']).shift(1).rolling(6).vs_game_pts.sum()
-
-# vs_win_pct
-gobc['vs_win_pct'] = gobc.groupby(['team_id']).shift(1).rolling(6).vs_win_pcta.mean()
-gobc['vs_win_pct'] = np.where(gobc['vs_win_pct'].shift(6).isnull(), np.NaN, gobc['vs_win_pct'])
-
-# avg_ptdiff
-gobc['ptdiff'] = gobc['final_points'] - gobc['vs_game_pts']
-gobc['avg_ptdiff'] = gobc.groupby(['team_id']).shift(1).rolling(6).ptdiff.mean()
-
-
-home = gobc[gobc['home_away'] == 'home']
-home.rename(columns = {'final_points':'game_pts'}, inplace = True)
-
-away = gobc[gobc['home_away'] == 'away'][['game_id', 'team_id', 'top_25', 'top_10', 'pts', 'vs_pts', 
-                                          'win_pct', 'vs_win_pct', 'avg_ptdiff', 'conf_name']]
-                                          
-away.rename(columns = {'team_id':'vs_team_id', 'top_25':'opp_top_25', 'top_10': 'opp_top_10', 
-                       'pts':'opp_pts', 'vs_pts': 'opp_vs_pts', 'win_pct':'opp_win_pct', 
-                       'vs_win_pct':'opp_vs_win_pct', 'avg_ptdiff':'opp_avg_ptdiff', 'conf_name':'opp_conf_name'}, inplace = True)
-                       
-final = home.merge(away, on = 'game_id', how = 'inner')
-
-final = final[final['pts'].notnull()][['game_id', 'date', 'ylabel', 'team_id', 'team', 'vs_team_id', 'vs_team', 'conf_play',
-                                       'game_pts', 'vs_game_pts', 'ptdiff', 'pts', 'opp_pts', 'vs_pts', 'opp_vs_pts', 
-                                       'avg_ptdiff', 'opp_avg_ptdiff', 'top_25', 'opp_top_25', 'top_10', 'opp_top_10',
-                                       'conf_name', 'opp_conf_name', 'year']]
-final['game_id'] = final['game_id'].astype(str)                                       
-final['team_id'] = final['team_id'].astype(str)                                       
-final['vs_team_id'] = final['vs_team_id'].astype(str)
-=======
 
 g2['v_pts_at61'] = g2.groupby(['game_id'])['h_pts_at6'].shift(-1)
 g2['v_pts_at62'] = g2.groupby(['game_id'])['h_pts_at6'].shift(1)
@@ -467,7 +419,6 @@ final = final[final['h_pts_st6'].notnull()]
 final['h_team_id'] = final['h_team_id'].astype(str)
 final['v_team_id'] = final['v_team_id'].astype(int).astype(str)
 
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 final.head(30)
 
 final[(final['h_team_id'] == '99') & (final['v_team_id'] == '228')]
@@ -497,17 +448,9 @@ final = final[(final['future'] == 0) & (final['v_team_id'].notnull()) & (final['
 
 # Pre-Processing
 ################################################################
-<<<<<<< HEAD
-initSet = final[['ylabel', 'team_id', 'vs_team_id', 'conf_play', 'pts', 'opp_pts',
-                  'vs_pts', 'opp_vs_pts', 'avg_ptdiff', 'opp_avg_ptdiff', 'top_25',
-                  'opp_top_25', 'top_10', 'opp_top_10', 'conf_name', 'opp_conf_name', 'year']].reset_index(drop = True)
-
-                 
-=======
 initSet = final.reset_index(drop = True)
 
 
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 # Check for null values
 null_count = initSet.isnull().sum()
 
@@ -543,11 +486,7 @@ for i in initSet.columns:
 # Merge the freqRatio with explore_df and print
 pd.merge(explore_initSet, frequency_ratios, on = 'index')\
   .sort_values(by = ['null_count', 'empty_string_count', 'unique_values'], ascending = False)
-<<<<<<< HEAD
-  
-=======
 
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 
 # Split the data into train and test
 from sklearn.model_selection import train_test_split
@@ -555,55 +494,20 @@ from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(initSet.drop('ylabel', axis = 1),
                                                     initSet['ylabel'],
                                                     test_size = 0.30,
-<<<<<<< HEAD
-                                                    random_state = 42)      
-                                                    
-=======
                                                     random_state = 42)
 
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 X_train = X_train.reset_index(drop = True); y_train = y_train.reset_index(drop = True)
 X_test = X_test.reset_index(drop = True); y_test = y_test.reset_index(drop = True)
 
 print('Training set shape = ' + str(X_train.shape))
 print('Testing set shape = ' + str(X_test.shape))
-<<<<<<< HEAD
-=======
 print('Future set shape = ' + str(future.shape))
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 
 # Impute missing data
 null_count = initSet.isnull().sum()
 # Validate that there are no more nulls
 print('Number of null values in training set = ' + str(X_train.isnull().sum().sum()))
 print('Number of null values in testing set = ' + str(X_test.isnull().sum().sum()))
-<<<<<<< HEAD
-
-for i in null_count[null_count > 0].index:
-    # get the values from the training set only
-    fcs_replacements = X_train.groupby(['opp_conf_name'])[i].mean().reset_index()
-    fcs_replacements = fcs_replacements.rename(columns = {i: ('fcs_' + i)})
-    non_fcs_replacements = X_train.groupby(['vs_team_id', 'year'])[i].mean().reset_index()
-    non_fcs_replacements = non_fcs_replacements.rename(colX_umns = {i: ('non_fcs_' + i)})
-    # Apply to the training set
-    X_train = X_train.merge(fcs_replacements, on = 'opp_conf_name', how = 'left')
-    X_train = X_train.merge(non_fcs_replacements, on = ['vs_team_id', 'year'], how = 'left')
-    X_train[i] = np.where(X_train[i].notnull(), 
-                          X_train[i], 
-                          np.where(X_train['opp_conf_name'] == 'FCS', 
-                                   X_train[('fcs_'+i)], 
-                                   X_train[('non_fcs_'+i)]))
-    X_train = X_train.drop(('fcs_'+i), axis = 1); X_train = X_train.drop(('non_fcs_'+i), axis = 1)
-    # Apply to the testing set
-    X_test = X_test.merge(fcs_replacements, on = 'opp_conf_name', how = 'left')
-    X_test = X_test.merge(non_fcs_replacements, on = ['vs_team_id', 'year'], how = 'left')
-    X_test[i] = np.where(X_test[i].notnull(), 
-                         X_test[i], 
-                         np.where(X_test['opp_conf_name'] == 'FCS', 
-                                  X_test[('fcs_'+i)], 
-                                  X_test[('non_fcs_'+i)]))
-    X_test = X_test.drop(('fcs_'+i), axis = 1); X_test = X_test.drop(('non_fcs_'+i), axis = 1)
-=======
 print('Number of null values in future set = ' + str(future.isnull().sum().sum()))
 
 for i in null_count[null_count > 0].index:
@@ -640,24 +544,10 @@ for i in null_count[null_count > 0].index:
                                   future[('non_fcs_'+i)]))
     future = future.drop(('fcs_'+i), axis = 1); future = future.drop(('non_fcs_'+i), axis = 1)
 
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 
 # Validate that there are no more nulls
 print('Number of null values in training set = ' + str(X_train.isnull().sum().sum()))
 print('Number of null values in testing set = ' + str(X_test.isnull().sum().sum()))
-<<<<<<< HEAD
-
-# After imputation, drop any remaining that still didn't get imputed.
-train_index_drop = X_train[X_train.isnull().any(axis=1)].index.tolist()
-for i in train_index_drop:
-    y_train = y_train.iloc[~y_train.index.isin(train_index_drop)]
-    X_train = X_train.iloc[~X_train.index.isin(train_index_drop)]
-
-test_index_drop = X_test[X_test.isnull().any(axis=1)].index.tolist()
-for i in test_index_drop:
-    y_test = y_test.iloc[~y_test.index.isin(test_index_drop)]
-    X_train = X_test.iloc[~X_test.index.isin(test_index_drop)]
-=======
 print('Number of null values in future set = ' + str(future.isnull().sum().sum()))
 
 # After imputation, drop any remaining that still didn't get imputed.
@@ -671,36 +561,24 @@ X_test = X_test.iloc[~X_test.index.isin(test_index_drop)]
 
 future_index_drop = future[future.isnull().any(axis=1)].index.tolist()
 future = future.iloc[~future.index.isin(future_index_drop)]
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 
 # Validate that there are no more nulls
 print('Number of null values in training set = ' + str(X_train.isnull().sum().sum()))
 print('Number of null values in testing set = ' + str(X_test.isnull().sum().sum()))
-<<<<<<< HEAD
-X_train.shape; y_train.shape
-X_test.shape; y_test.shape
-=======
 print('Number of null values in future set = ' + str(future.isnull().sum().sum()))
 X_train.shape; y_train.shape
 X_test.shape; y_test.shape
 future.shape
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 
 
 # One-hot encode cateogircal variables (ensuring both the train and test sets only contain the one-hot encoded train fields)
 train_X = pd.get_dummies(X_train)
 test_X = pd.get_dummies(X_test)
-<<<<<<< HEAD
-
-# Check to see if there are dummy variables in the train set that aren't in the test set,
-# and synthetically create the variables in the test set.
-=======
 future_X = pd.get_dummies(future)
 
 # Check to see if there are dummy variables in the train set that aren't in the test set,
 # and synthetically create the variables in the test set.
 # test set
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 missing_cols = set(train_X.columns) - set(test_X.columns)
 
 if len(missing_cols) == 0:
@@ -714,8 +592,6 @@ else:
 # and that the variables are in the same order.
 test_X = test_X[train_X.columns]
 
-<<<<<<< HEAD
-=======
 # future set
 missing_cols = set(train_X.columns) - set(future_X.columns)
 
@@ -730,19 +606,15 @@ else:
 # and that the variables are in the same order.
 future_X = future_X[train_X.columns]
 
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 print('One-hot encoded train set shape:')
 print(train_X.shape)
 
 print('One-hot encoded test set shape:')
 print(test_X.shape)
 
-<<<<<<< HEAD
-=======
 print('One-hot encoded future set shape:')
 print(future_X.shape)
 
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
 
 
 # Baseline Random Forest Build
@@ -777,12 +649,6 @@ review = pd.DataFrame({'y':y_test, 'predicted_y':rf_base_predictions, 'predicted
 loss_misses = review[(review['y'] == 0) & (review['predicted_y'] == 1)].sort_values(by = 'predicted_probs', ascending = False)
 
 def dig(x):
-<<<<<<< HEAD
-    print(final[(final['team_id'] ==  X_test.iloc[x]['team_id']) & (final['vs_team_id'] == X_test.iloc[x]['vs_team_id']) & (final['year'] == X_test.iloc[x]['year'])])
-
-
-
-=======
     print(final[(final['h_team_id'] ==  X_test.iloc[x]['h_team_id']) & (final['v_team_id'] == X_test.iloc[x]['v_team_id']) & (final['year'] == X_test.iloc[x]['year'])].index)
 
 # test different conservative thresholds
@@ -835,4 +701,3 @@ def dig(x):
 # Buff win -5000
 # UCF win -1600
 # Kansas loss +475
->>>>>>> 5662a2f5e639263ea30f87099e3c7f3554ac56f4
