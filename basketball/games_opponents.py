@@ -8,20 +8,22 @@ from bs4 import BeautifulSoup
 import re
 import json
 from datetime import date, timedelta
+from io import StringIO
+import boto3
 
 
 
 
 game_dates = []
-
 # this is the section to use if you want to do an update over multiple days
-# game_dates format is ['yyyymmdd']
-# startdate = date(int(2020), int(1), int(1))
-# while startdate < date.today():
-#     game_dates.append(re.sub('-', '', str(startdate)))
-#     startdate += timedelta(days=1)
+game_dates format is ['yyyymmdd']
+startdate = date(int(2019), int(12), int(1))
+while startdate < date.today():
+  game_dates.append(re.sub('-', '', str(startdate)))
+  startdate += timedelta(days=1)
 
-game_dates.append(re.sub('-', '', str(date.today()-timedelta(1))))
+# function for just one day
+#game_dates.append(re.sub('-', '', str(date.today()-timedelta(1))))
 
 for i in game_dates:
     link_date = str(i)

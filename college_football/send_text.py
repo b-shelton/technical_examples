@@ -18,7 +18,7 @@ msg = MIMEMultipart()
 msg['From'] = email
 msg['To'] = sms_gateway
 msg['Subject'] = "\tsomething smells\n\n"
-body = '\tgo change his diaper!\n'
+body = subject
 msg.attach(MIMEText(body, 'plain'))
 
 sms = msg.as_string()
