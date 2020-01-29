@@ -15,7 +15,7 @@ import boto3
 game_dates = []
 # this is the section to use if you want to do an update over multiple days
 # game_dates format is ['yyyymmdd']
-startdate = date(int(2018), int(11), int(10))
+startdate = date(int(2017), int(10), int(1))
 while startdate < date.today():
   game_dates.append(re.sub('-', '', str(startdate)))
   startdate += timedelta(days=1)
@@ -140,9 +140,10 @@ for i in game_dates:
           #
           # Get boxcores for each game
           # -------------------------------------------------------------------------
-          team = []; player_uid=[]; player_name=[]; player_pos=[]; minutes=[]; fg=[]; three_pt=[]; ft=[];
-          oreb=[]; dreb=[]; reb=[]; ast=[]; stl=[]; blk=[]; to=[]; pf=[]; plusminus=[]; game_id=[]; 
-          rem_game_id = []
+          team = []; player_uid=[]; player_name=[]; player_pos=[]; minutes=[]; 
+          fg=[]; three_pt=[]; ft=[]; oreb=[]; dreb=[]; reb=[]; ast=[]; stl=[]; 
+          blk=[]; to=[]; pf=[]; plusminus=[]; pts=[]; game_id=[];
+          rem_game_id=[]
           #
           for i in range(len(games)):
               if games.iloc[i]['completed'] == True:
@@ -187,7 +188,7 @@ for i in game_dates:
                                 to.append('0')
                                 pf.append('0')
                                 plusminus.append('0')
-                                pt.append('0')
+                                pts.append('0')
                               else:
                                 minutes.append(players[j].find_all('a')[0].findNext('td').get_text())
                                 fg.append(players[j].find_all('a')[0].findNext('td').findNext('td').get_text())
@@ -202,7 +203,7 @@ for i in game_dates:
                                 to.append(players[j].find_all('a')[0].findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').get_text())
                                 pf.append(players[j].find_all('a')[0].findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').get_text())
                                 plusminus.append(players[j].find_all('a')[0].findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').get_text())
-                                pts.append(players[j].find_all('a')[0].findNext('td').get_text())
+                                pts.append(players[j].find_all('a')[0].findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').get_text())
                           except:
                               continue
                   if len(counter) > 0:
@@ -225,6 +226,7 @@ for i in game_dates:
                                      'blk':blk,
                                      'to':to,
                                      'pf':pf,
+                                     'pts':pts,
                                      'plusminus':plusminus})
           #
           games = games[~games['game_id'].isin(rem_game_id)]
