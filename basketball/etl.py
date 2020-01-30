@@ -17,21 +17,21 @@ os.system(f'mkdir {local_tmp}')
 os.system(f'aws s3 sync s3://b-shelton-sports/nba/games {local_tmp}')
 games = pd.concat(map(pd.read_csv, glob.glob(f'{local_tmp}/*.gz')))
 os.system(f'rm -r {local_tmp}')
-display(games.shape)
+games.shape
 
 # read the opponents from S3
 os.system(f'mkdir {local_tmp}')
 os.system(f'aws s3 sync s3://b-shelton-sports/nba/opponents {local_tmp}')
 opp = pd.concat(map(pd.read_csv, glob.glob(f'{local_tmp}/*.gz')))
 os.system(f'rm -r {local_tmp}')
-display(opp.shape)
+opp.shape
 
 # read the box scores from S3
 os.system(f'mkdir {local_tmp}')
 os.system(f'aws s3 sync s3://b-shelton-sports/nba/boxscores {local_tmp}')
 box = pd.concat(map(pd.read_csv, glob.glob(f'{local_tmp}/*.gz')))
 os.system(f'rm -r {local_tmp}')
-display(box.shape)
+box.shape
 
 
 # Get rid of games not involving one of the 30 NBA teams
@@ -202,11 +202,14 @@ gha.shape
 gha.head()
 gha.columns
 
+
 # Calculate the point difference for each game
 gha['true_away_spread'] = gha['h_final_points'] - gha['a_final_points']
-gha[['label', 'h_team', 'a_team', 'h_final_points', 
+gha[['game_id', 'date', 'label', 'h_team', 'a_team', 'h_final_points', 
      'a_final_points', 'true_away_spread']].head(40)
+     
 
+del(games); del(opp); del(box); del(num_desc); del(num_desc2); del(oppbox)
 
 # Get the stats from the last x games for the home team and their current visitor.
 # Everything listed below for home teams gets calc'd for the away teams too.
@@ -214,8 +217,8 @@ gha[['label', 'h_team', 'a_team', 'h_final_points',
 
 # h_winpct: home team's win percentage over the last x games
 # h_winpct_500: home team's win percentage against over .500 teams in the last x games
-# h_pts_stx: points scored by the home team over their last x total games
-# h_pts_atx: points scored against the home team over their last x total games
+# h_pts_stx: total points scored by the home team over their last x total games
+# h_pts_atx: total points scored against the home team over their last x total games
 # h_ptdiff_tx: average point differential of the home team over their last x total games
 # h_ast_stx: total assists by the home team over their last x total games
 # h_ast_atx: total assists against the home team over their last x total games
@@ -243,3 +246,81 @@ gha[['label', 'h_team', 'a_team', 'h_final_points',
 # h_oreb_perc_stx: average offense rebound % by the home team over their last x total games
 # h_reb_atx: total rebounds against the home team over their last x total games
 # h_oreb_perc_atx: average offensive rebound % against the home team over their last x total games
+
+
+x = 10
+
+# Sort games by home team and date
+gha = gha.sort_values(by = ['h_team_id', 'date'], ascending = True).reset_index(drop = True)
+
+# Straight forward average stats function for home team
+gha['h_winpct'] = gha.groupby(['h_team_id']).shift(1).rolling(x).label.mean()
+gha[f'h_ptdiff_t{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).true_away_spread.mean()
+gha[f'h_3pt_perc_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_three_pt_perc.mean()
+gha[f'h_3pt_perc_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_three_pt_perc.mean()
+gha[f'h_ft_perc_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_ft_perc.mean()
+gha[f'h_ft_perc_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_ft_perc.mean()
+gha[f'h_oreb_perc_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_oreb_perc.mean()
+gha[f'h_oreb_perc_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_oreb_perc.mean()
+
+# Straight forward sum stats function for home team
+gha[f'h_pts_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_final_points.sum()   
+gha[f'h_pts_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_final_points.sum()   
+gha[f'h_ast_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_ast.sum()    
+gha[f'h_ast_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_ast.sum()  
+gha[f'h_stl_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_stl.sum()  
+gha[f'h_stl_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_stl.sum()   
+gha[f'h_blk_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_blk.sum()  
+gha[f'h_blk_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_blk.sum()  
+gha[f'h_to_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_to.sum()  
+gha[f'h_to_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_to.sum() 
+gha[f'h_pf_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_pf.sum()  
+gha[f'h_pf_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_pf.sum() 
+gha[f'h_fgatt_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_fg_att.sum()  
+gha[f'h_fgatt_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_fg_att.sum()  
+gha[f'h_fgmade_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_fg_made.sum()  
+gha[f'h_fgmade_a{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_fg_made.sum()  
+gha[f'h_3ptatt_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_three_pt_att.sum()  
+gha[f'h_3ptatt_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_three_pt_att.sum()  
+gha[f'h_ftatt_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_ft_att.sum()  
+gha[f'h_ftatt_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_ft_att.sum()   
+gha[f'h_reb_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_reb.sum()  
+gha[f'a_reb_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_reb.sum()  
+
+
+# Sort games by away team and date
+gha = gha.sort_values(by = ['a_team_id', 'date'], ascending = True).reset_index(drop = True)
+
+# Straight forward average stats function for home team
+gha['a_winpct'] = gha.groupby(['a_team_id']).shift(1).rolling(x).label.mean()
+gha[f'a_ptdiff_t{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).true_away_spread.mean()
+gha[f'a_3pt_perc_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_three_pt_perc.mean()
+gha[f'a_3pt_perc_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_three_pt_perc.mean()
+gha[f'a_ft_perc_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_ft_perc.mean()
+gha[f'a_ft_perc_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_ft_perc.mean()
+gha[f'a_oreb_perc_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_oreb_perc.mean()
+gha[f'a_oreb_perc_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_oreb_perc.mean()
+
+# Straight forward sum stats function for home team
+gha[f'a_pts_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_final_points.sum()   
+gha[f'a_pts_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_final_points.sum()   
+gha[f'a_ast_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_ast.sum()    
+gha[f'a_ast_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_ast.sum()  
+gha[f'a_stl_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_stl.sum()  
+gha[f'a_stl_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_stl.sum()   
+gha[f'a_blk_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_blk.sum()  
+gha[f'a_blk_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_blk.sum()  
+gha[f'a_to_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_to.sum()  
+gha[f'a_to_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_to.sum() 
+gha[f'a_pf_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_pf.sum()  
+gha[f'a_pf_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_pf.sum() 
+gha[f'a_fgatt_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_fg_att.sum()  
+gha[f'a_fgatt_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_fg_att.sum()  
+gha[f'a_fgmade_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_fg_made.sum()  
+gha[f'a_fgmade_a{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_fg_made.sum()  
+gha[f'a_3ptatt_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_three_pt_att.sum()  
+gha[f'a_3ptatt_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_three_pt_att.sum()  
+gha[f'a_ftatt_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_ft_att.sum()  
+gha[f'a_ftatt_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_ft_att.sum()   
+gha[f'a_reb_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_reb.sum()  
+gha[f'a_reb_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_reb.sum() 
