@@ -146,11 +146,11 @@ num_desc2['three_pt_perc'] = num_desc2['three_pt_made'] / num_desc2['three_pt_at
 num_desc2 = num_desc2.drop(['ft_made', 'oreb', 'dreb', 'three_pt_made'], axis = 1)
 
 # Create updated team-game-level EDA of the major stats
-profile = num_desc2.profile_report(title = 'Pandas Profiling Report')
-date_suffix = re.sub('-', '', str(date.today()))
-profile.to_file(output_file = f'nba_adj_pandas_profiling_{date_suffix}.html')
-os.system(f'aws s3 sync /home/ec2-user s3://b-shelton-sports/nba/eda --exclude "*" --include "nba_adj_pandas_profiling_{date_suffix}.html"')
-os.system(f'rm -r /home/ec2-user/nba_adj_pandas_profiling_{date_suffix}.html')
+# profile = num_desc2.profile_report(title = 'Pandas Profiling Report')
+# date_suffix = re.sub('-', '', str(date.today()))
+# profile.to_file(output_file = f'nba_adj_pandas_profiling_{date_suffix}.html')
+# os.system(f'aws s3 sync /home/ec2-user s3://b-shelton-sports/nba/eda --exclude "*" --include "nba_adj_pandas_profiling_{date_suffix}.html"')
+# os.system(f'rm -r /home/ec2-user/nba_adj_pandas_profiling_{date_suffix}.html')
 
 
 
@@ -160,9 +160,259 @@ games[games['game_id'].isin(key_diff)][['game_id', 'completed']]
 
 oppbox = opp.merge(num_desc2, on = ['game_id', 'team'], how = 'inner')
 opp.shape[0] == oppbox.shape[0]
+
+t = ['game_id', 'home_away']
+oppbox1 = oppbox[t]
+oppbox2 = oppbox.drop(t, axis = 1)
+oppbox2.columns =  ['h_' + i for i in oppbox2.columns]
+oppbox = pd.concat([oppbox1, oppbox2], axis = 1)
+oppbox['h_label'] = np.where(oppbox['h_winner'] == True, 1, 0)
 oppbox.head()
       
-      
+
+
+# Get the stats from the last x games for the home team and their current visitor.
+# Everything listed below for home teams gets calc'd for the away teams too.
+################################################################################
+
+# h_winpct: home team's win percentage over the last x games
+# h_winpct_500: home team's win percentage against over .500 teams in the last x games
+# h_pts_stx: total points scored by the home team over their last x total games
+# h_pts_atx: total points scored against the home team over their last x total games
+# h_ptdiff_tx: average point differential of the home team over their last x total games
+# h_ast_stx: total assists by the home team over their last x total games
+# h_ast_atx: total assists against the home team over their last x total games
+# h_stl_stx: total steals by the home team over their last x total games
+# h_stl_atx: total steals against the home team over their last x total games
+# h_blk_stx: total blocks by the home team over their last x total games
+# h_blk_atx: total blocks against the home team over their last x total games
+# h_to_stx: total turnovers by the home team over their last x total games
+# h_to_atx: total turnovers against the home team over their last x total games
+# h_pf_stx: total fouls by the home team over their last x total games
+# h_pf_atx: total fouls against the home team over their last x total games
+# h_fgmade_stx: total fg made by the home team over their last x total games
+# h_fgatt_stx: total fg attempted by the home team over their last x total games
+# h_fgmade_atx: total rebounds against the home team over their last x total games
+# h_fgatt_atx: total fg attempted against the home team over their last x total games
+# h_3ptatt_stx: total 3-pointers attempted by the home team over their last x total games
+# h_3pt_perc_stx: average 3-point % by the home team over their last x total games
+# h_3ptatt_atx: total 3-pointers attempted against the home team over their last x total games
+# h_3pt_perc_atx: average 3-point % against the home team over their last x total games
+# h_ftatt_stx: total free-throw attempted by the home team over their last x total games
+# h_ft_perc_stx: average free-throw % by the home team over their last x total games
+# h_ftatt_atx: total free-throw attempted against the home team over their last x total games
+# h_ft_perc_atx: average free-throw % against the home team over their last x total games
+# h_reb_stx: total rebounds by the home team over their last x total games
+# h_oreb_perc_stx: average offense rebound % by the home team over their last x total games
+# h_reb_atx: total rebounds against the home team over their last x total games
+# h_oreb_perc_atx: average offensive rebound % against the home team over their last x total games
+
+
+# join game-level data to game/team level data
+gob = games.merge(oppbox, on = 'game_id', how = 'inner')
+gob.head()
+    
+x = 10
+
+# Sort games by home team and date
+gob = gob.sort_values(by = ['h_team_id', 'date'], ascending = True).reset_index(drop = True)
+
+# Straight forward average stats function for home team
+gob['h_winpct'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_label.mean()
+gob[f'h_3pt_perc_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_three_pt_perc.mean()
+gob[f'h_ft_perc_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_ft_perc.mean()
+gob[f'h_oreb_perc_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_oreb_perc.mean()
+
+# Straight forward sum stats function for home team
+gob[f'h_pts_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_final_points.sum()   
+gob[f'h_ast_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_ast.sum()    
+gob[f'h_stl_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_stl.sum()  
+gob[f'h_blk_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_blk.sum()  
+gob[f'h_to_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_to.sum()  
+gob[f'h_pf_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_pf.sum()  
+gob[f'h_fgatt_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_fg_att.sum()   
+gob[f'h_fgmade_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_fg_made.sum()   
+gob[f'h_3ptatt_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_three_pt_att.sum()  
+gob[f'h_ftatt_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_ft_att.sum()  
+gob[f'h_reb_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_reb.sum()  
+
+
+# get the opponent's game-level stats on the same row for each game
+g2 = gob.sort_values(by = 'game_id')
+
+visiting_col = ['team_id', 'team', 'winpct', 'final_points', 'min', 'reb', 'ast', 
+                'stl', 'blk',  'to', 'pf', 'fg_made', 'fg_att', 'three_pt_att', 
+                'ft_att', 'plusminus', 'ft_perc', 'oreb_perc', 'three_pt_perc',
+                f'3pt_perc_st{x}', f'ft_perc_st{x}', f'oreb_perc_st{x}',
+                f'pts_st{x}', f'ast_st{x}', f'stl_st{x}', f'blk_st{x}',
+                f'to_st{x}', f'pf_st{x}', f'fgatt_st{x}', f'fgmade_st{x}',
+                f'3ptatt_st{x}', f'ftatt_st{x}', f'reb_st{x}']
+for i in visiting_col:
+    g2[f'v_{i}1'] = g2.groupby(['game_id'])[f'h_{i}'].shift(-1)
+    g2[f'v_{i}2'] = g2.groupby(['game_id'])[f'h_{i}'].shift(1)
+    g2[f'v_{i}'] = np.where(g2[f'v_{i}1'].isnull(), g2[f'v_{i}2'], g2[f'v_{i}1'])
+    g2 = g2.drop([f'v_{i}1', f'v_{i}2'], axis = 1)
+    
+
+g2_keep = ['game_id', 'h_team_id'] + ['v_' + i for i in visiting_col]
+g2 = g2[g2_keep]
+gob = gob.merge(g2, on = ['game_id', 'h_team_id'], how = 'inner')
+del(g2); del(visiting_col)
+
+
+# home stats that needed the visiting team's stats
+gob['ptdiff'] = gob['h_final_points'] - gob['v_final_points']
+gob[f'h_ptdiff_t{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).ptdiff.mean()
+
+gob[f'h_3pt_perc_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_three_pt_perc.mean()
+gob[f'h_ft_perc_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_ft_perc.mean()
+gob[f'h_oreb_perc_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_oreb_perc.mean()
+
+gob[f'h_pts_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_final_points.sum()   
+gob[f'h_ast_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_ast.sum()    
+gob[f'h_stl_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_stl.sum()  
+gob[f'h_blk_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_blk.sum()  
+gob[f'h_to_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_to.sum()  
+gob[f'h_pf_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_pf.sum()  
+gob[f'h_fgatt_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_fg_att.sum()   
+gob[f'h_fgmade_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_fg_made.sum()   
+gob[f'h_3ptatt_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_three_pt_att.sum()  
+gob[f'h_ftatt_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_ft_att.sum()  
+gob[f'h_reb_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).v_reb.sum()  
+
+
+# finish the visiting stats made from the last section
+g2 = gob.sort_values(by = 'game_id')
+visiting_col = [f'ptdiff_t{x}', f'3pt_perc_at{x}', f'ft_perc_at{x}', f'oreb_perc_at{x}',
+                f'pts_at{x}', f'ast_at{x}', f'stl_at{x}', f'blk_at{x}',
+                f'to_at{x}', f'pf_at{x}', f'fgatt_at{x}', f'fgmade_at{x}',
+                f'3ptatt_at{x}', f'ftatt_at{x}', f'reb_at{x}']
+for i in visiting_col:
+    g2[f'v_{i}1'] = g2.groupby(['game_id'])[f'h_{i}'].shift(-1)
+    g2[f'v_{i}2'] = g2.groupby(['game_id'])[f'h_{i}'].shift(1)
+    g2[f'v_{i}'] = np.where(g2[f'v_{i}1'].isnull(), g2[f'v_{i}2'], g2[f'v_{i}1'])
+    g2 = g2.drop([f'v_{i}1', f'v_{i}2'], axis = 1)
+
+g2_keep = ['game_id', 'h_team_id'] + ['v_' + i for i in visiting_col]
+g2 = g2[g2_keep]
+gob = gob.merge(g2, on = ['game_id', 'h_team_id'], how = 'inner')
+del(g2); del(visiting_col)
+
+
+# Create final dataset
+final = gob[(gob['home_away'] == 'home') & (gob[f'h_pts_st{x}'].notnull())]
+final = final[['h_label',
+               'h_team_id',
+               'h_team',
+               'h_winpct',
+               f'h_pts_st{x}',
+               f'h_pts_at{x}',
+               f'h_ptdiff_t{x}',
+               f'h_ast_st{x}',
+               f'h_ast_at{x}',
+               f'h_stl_st{x}',
+               f'h_stl_at{x}',
+               f'h_blk_st{x}',
+               f'h_blk_at{x}',
+               f'h_to_st{x}',
+               f'h_to_at{x}',
+               f'h_pf_st{x}',
+               f'h_pf_at{x}',
+               f'h_fgmade_st{x}',
+               f'h_fgatt_st{x}',
+               f'h_fgmade_at{x}',
+               f'h_fgatt_at{x}',
+               f'h_3ptatt_st{x}',
+               f'h_3pt_perc_st{x}',
+               f'h_3ptatt_at{x}',
+               f'h_3pt_perc_at{x}',
+               f'h_ftatt_st{x}',
+               f'h_ft_perc_st{x}',
+               f'h_ftatt_at{x}',
+               f'h_ft_perc_at{x}',
+               f'h_reb_st{x}',
+               f'h_oreb_perc_st{x}',
+               f'h_reb_at{x}',
+               f'h_oreb_perc_at{x}',
+               'v_team_id',
+               'v_team',
+               'v_winpct',
+               f'v_pts_st{x}',
+               f'v_pts_at{x}',
+               f'v_ptdiff_t{x}',
+               f'v_ast_st{x}',
+               f'v_stl_st{x}',
+               f'v_stl_at{x}',
+               f'v_blk_st{x}',
+               f'v_blk_at{x}',
+               f'v_to_st{x}',
+               f'v_to_at{x}',
+               f'v_pf_st{x}',
+               f'v_pf_at{x}',
+               f'v_fgmade_st{x}',
+               f'v_fgatt_st{x}',
+               f'v_fgmade_at{x}',
+               f'v_fgatt_at{x}',
+               f'v_3ptatt_st{x}',
+               f'v_3pt_perc_st{x}',
+               f'v_3ptatt_at{x}',
+               f'v_3pt_perc_at{x}',
+               f'v_ftatt_st{x}',
+               f'v_ft_perc_st{x}',
+               f'v_ftatt_at{x}',
+               f'v_ft_perc_at{x}',
+               f'v_reb_st{x}',
+               f'v_oreb_perc_st{x}',
+               f'v_reb_at{x}',
+               f'v_oreb_perc_at{x}']]
+
+
+
+
+
+
+# Sort games by away team and date
+gob = gob.sort_values(by = ['a_team_id', 'date'], ascending = True).reset_index(drop = True)
+
+# Straight forward average stats function for home team
+gob['a_winpct'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_label.mean()
+gob[f'a_ptdiff_t{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_true_away_spread.mean()
+gob[f'a_3pt_perc_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_three_pt_perc.mean()
+gob[f'a_3pt_perc_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_three_pt_perc.mean()
+gob[f'a_ft_perc_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_ft_perc.mean()
+gob[f'a_ft_perc_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_ft_perc.mean()
+gob[f'a_oreb_perc_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_oreb_perc.mean()
+gob[f'a_oreb_perc_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_oreb_perc.mean()
+
+# Straight forward sum stats function for home team
+gob[f'a_pts_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_final_points.sum()   
+gob[f'a_pts_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_final_points.sum()   
+gob[f'a_ast_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_ast.sum()    
+gob[f'a_ast_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_ast.sum()  
+gob[f'a_stl_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_stl.sum()  
+gob[f'a_stl_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_stl.sum()   
+gob[f'a_blk_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_blk.sum()  
+gob[f'a_blk_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_blk.sum()  
+gob[f'a_to_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_to.sum()  
+gob[f'a_to_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_to.sum() 
+gob[f'a_pf_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_pf.sum()  
+gob[f'a_pf_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_pf.sum() 
+gob[f'a_fgatt_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_fg_att.sum()  
+gob[f'a_fgatt_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_fg_att.sum()  
+gob[f'a_fgmade_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_fg_made.sum()  
+gob[f'a_fgmade_a{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_fg_made.sum()  
+gob[f'a_3ptatt_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_three_pt_att.sum()  
+gob[f'a_3ptatt_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_three_pt_att.sum()  
+gob[f'a_ftatt_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_ft_att.sum()  
+gob[f'a_ftatt_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_ft_att.sum()   
+gob[f'a_reb_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_reb.sum()  
+gob[f'a_reb_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_reb.sum() 
+
+
+
+
+
+
 # Add the home team's stats to the game level info
 def home_away(hora):
     team_a = oppbox[oppbox['home_away'] == hora]
@@ -196,16 +446,16 @@ gh.head()
     
 # Add the visiting team's stats to the game level info
 awayteam = home_away('away')
-gha = gh.merge(awayteam, on = 'game_id', how = 'inner')
-gha.shape[0] == gh.shape[0]
-gha.shape
-gha.head()
-gha.columns
+gob = gh.merge(awayteam, on = 'game_id', how = 'inner')
+gob.shape[0] == gh.shape[0]
+gob.shape
+gob.head()
+gob.columns
 
 
 # Calculate the point difference for each game
-gha['true_away_spread'] = gha['h_final_points'] - gha['a_final_points']
-gha[['game_id', 'date', 'label', 'h_team', 'a_team', 'h_final_points', 
+gob['true_away_spread'] = gob['h_final_points'] - gob['a_final_points']
+gob[['game_id', 'date', 'label', 'h_team', 'a_team', 'h_final_points', 
      'a_final_points', 'true_away_spread']].head(40)
      
 
@@ -251,76 +501,81 @@ del(games); del(opp); del(box); del(num_desc); del(num_desc2); del(oppbox)
 x = 10
 
 # Sort games by home team and date
-gha = gha.sort_values(by = ['h_team_id', 'date'], ascending = True).reset_index(drop = True)
+gob = gob.sort_values(by = ['h_team_id', 'date'], ascending = True).reset_index(drop = True)
 
 # Straight forward average stats function for home team
-gha['h_winpct'] = gha.groupby(['h_team_id']).shift(1).rolling(x).label.mean()
-gha[f'h_ptdiff_t{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).true_away_spread.mean()
-gha[f'h_3pt_perc_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_three_pt_perc.mean()
-gha[f'h_3pt_perc_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_three_pt_perc.mean()
-gha[f'h_ft_perc_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_ft_perc.mean()
-gha[f'h_ft_perc_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_ft_perc.mean()
-gha[f'h_oreb_perc_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_oreb_perc.mean()
-gha[f'h_oreb_perc_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_oreb_perc.mean()
+gob['h_winpct'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_label.mean()
+gob[f'h_ptdiff_t{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_true_away_spread.mean()
+gob[f'h_3pt_perc_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_three_pt_perc.mean()
+gob[f'h_3pt_perc_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_three_pt_perc.mean()
+gob[f'h_ft_perc_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_ft_perc.mean()
+gob[f'h_ft_perc_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_ft_perc.mean()
+gob[f'h_oreb_perc_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_oreb_perc.mean()
+gob[f'h_oreb_perc_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_oreb_perc.mean()
 
 # Straight forward sum stats function for home team
-gha[f'h_pts_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_final_points.sum()   
-gha[f'h_pts_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_final_points.sum()   
-gha[f'h_ast_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_ast.sum()    
-gha[f'h_ast_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_ast.sum()  
-gha[f'h_stl_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_stl.sum()  
-gha[f'h_stl_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_stl.sum()   
-gha[f'h_blk_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_blk.sum()  
-gha[f'h_blk_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_blk.sum()  
-gha[f'h_to_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_to.sum()  
-gha[f'h_to_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_to.sum() 
-gha[f'h_pf_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_pf.sum()  
-gha[f'h_pf_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_pf.sum() 
-gha[f'h_fgatt_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_fg_att.sum()  
-gha[f'h_fgatt_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_fg_att.sum()  
-gha[f'h_fgmade_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_fg_made.sum()  
-gha[f'h_fgmade_a{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_fg_made.sum()  
-gha[f'h_3ptatt_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_three_pt_att.sum()  
-gha[f'h_3ptatt_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_three_pt_att.sum()  
-gha[f'h_ftatt_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_ft_att.sum()  
-gha[f'h_ftatt_at{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_ft_att.sum()   
-gha[f'h_reb_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).h_reb.sum()  
-gha[f'a_reb_st{x}'] = gha.groupby(['h_team_id']).shift(1).rolling(x).a_reb.sum()  
+gob[f'h_pts_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_final_points.sum()   
+gob[f'h_pts_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_final_points.sum()   
+gob[f'h_ast_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_ast.sum()    
+gob[f'h_ast_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_ast.sum()  
+gob[f'h_stl_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_stl.sum()  
+gob[f'h_stl_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_stl.sum()   
+gob[f'h_blk_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_blk.sum()  
+gob[f'h_blk_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_blk.sum()  
+gob[f'h_to_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_to.sum()  
+gob[f'h_to_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_to.sum() 
+gob[f'h_pf_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_pf.sum()  
+gob[f'h_pf_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_pf.sum() 
+gob[f'h_fgatt_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_fg_att.sum()  
+gob[f'h_fgatt_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_fg_att.sum()  
+gob[f'h_fgmade_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_fg_made.sum()  
+gob[f'h_fgmade_a{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_fg_made.sum()  
+gob[f'h_3ptatt_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_three_pt_att.sum()  
+gob[f'h_3ptatt_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_three_pt_att.sum()  
+gob[f'h_ftatt_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_ft_att.sum()  
+gob[f'h_ftatt_at{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_ft_att.sum()   
+gob[f'h_reb_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_reb.sum()  
+gob[f'a_reb_st{x}'] = gob.groupby(['h_team_id']).shift(1).rolling(x).h_a_reb.sum()  
 
 
 # Sort games by away team and date
-gha = gha.sort_values(by = ['a_team_id', 'date'], ascending = True).reset_index(drop = True)
+gob = gob.sort_values(by = ['a_team_id', 'date'], ascending = True).reset_index(drop = True)
 
 # Straight forward average stats function for home team
-gha['a_winpct'] = gha.groupby(['a_team_id']).shift(1).rolling(x).label.mean()
-gha[f'a_ptdiff_t{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).true_away_spread.mean()
-gha[f'a_3pt_perc_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_three_pt_perc.mean()
-gha[f'a_3pt_perc_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_three_pt_perc.mean()
-gha[f'a_ft_perc_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_ft_perc.mean()
-gha[f'a_ft_perc_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_ft_perc.mean()
-gha[f'a_oreb_perc_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_oreb_perc.mean()
-gha[f'a_oreb_perc_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_oreb_perc.mean()
+gob['a_winpct'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_label.mean()
+gob[f'a_ptdiff_t{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_true_away_spread.mean()
+gob[f'a_3pt_perc_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_three_pt_perc.mean()
+gob[f'a_3pt_perc_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_three_pt_perc.mean()
+gob[f'a_ft_perc_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_ft_perc.mean()
+gob[f'a_ft_perc_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_ft_perc.mean()
+gob[f'a_oreb_perc_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_oreb_perc.mean()
+gob[f'a_oreb_perc_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_oreb_perc.mean()
 
 # Straight forward sum stats function for home team
-gha[f'a_pts_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_final_points.sum()   
-gha[f'a_pts_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_final_points.sum()   
-gha[f'a_ast_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_ast.sum()    
-gha[f'a_ast_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_ast.sum()  
-gha[f'a_stl_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_stl.sum()  
-gha[f'a_stl_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_stl.sum()   
-gha[f'a_blk_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_blk.sum()  
-gha[f'a_blk_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_blk.sum()  
-gha[f'a_to_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_to.sum()  
-gha[f'a_to_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_to.sum() 
-gha[f'a_pf_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_pf.sum()  
-gha[f'a_pf_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_pf.sum() 
-gha[f'a_fgatt_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_fg_att.sum()  
-gha[f'a_fgatt_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_fg_att.sum()  
-gha[f'a_fgmade_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_fg_made.sum()  
-gha[f'a_fgmade_a{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_fg_made.sum()  
-gha[f'a_3ptatt_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_three_pt_att.sum()  
-gha[f'a_3ptatt_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_three_pt_att.sum()  
-gha[f'a_ftatt_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_ft_att.sum()  
-gha[f'a_ftatt_at{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_ft_att.sum()   
-gha[f'a_reb_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).h_reb.sum()  
-gha[f'a_reb_st{x}'] = gha.groupby(['a_team_id']).shift(1).rolling(x).a_reb.sum() 
+gob[f'a_pts_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_final_points.sum()   
+gob[f'a_pts_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_final_points.sum()   
+gob[f'a_ast_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_ast.sum()    
+gob[f'a_ast_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_ast.sum()  
+gob[f'a_stl_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_stl.sum()  
+gob[f'a_stl_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_stl.sum()   
+gob[f'a_blk_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_blk.sum()  
+gob[f'a_blk_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_blk.sum()  
+gob[f'a_to_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_to.sum()  
+gob[f'a_to_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_to.sum() 
+gob[f'a_pf_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_pf.sum()  
+gob[f'a_pf_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_pf.sum() 
+gob[f'a_fgatt_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_fg_att.sum()  
+gob[f'a_fgatt_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_fg_att.sum()  
+gob[f'a_fgmade_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_fg_made.sum()  
+gob[f'a_fgmade_a{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_fg_made.sum()  
+gob[f'a_3ptatt_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_three_pt_att.sum()  
+gob[f'a_3ptatt_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_three_pt_att.sum()  
+gob[f'a_ftatt_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_ft_att.sum()  
+gob[f'a_ftatt_at{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_ft_att.sum()   
+gob[f'a_reb_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_reb.sum()  
+gob[f'a_reb_st{x}'] = gob.groupby(['h_a_team_id']).shift(1).rolling(x).h_a_reb.sum() 
+
+
+#
+# visiting team scored stats over last x games
+g2 = gob.sort_values(by = 'game_id')
