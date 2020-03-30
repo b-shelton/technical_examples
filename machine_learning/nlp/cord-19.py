@@ -233,7 +233,7 @@ topic_ids = []
 for i in range(0, no_topics):
     topic_ids.append(f'topic{i}')
 
-topics = pd.DataFrame({'topic_id': topic_names,
+topics = pd.DataFrame({'topic_id': topic_ids,
     'topic_name': ['animal virus',
                    'animal tesing',
                    'outbreak \nmonitoring',
