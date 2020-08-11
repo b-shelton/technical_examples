@@ -96,8 +96,8 @@ doj = pd.DataFrame({'publish_date': article_dates,
 # Write doj to private S3 bucket
 # To update or rotate security keys, go to aws > my security credentials > users > add new key
 # ------------------------------------------------------------------------------
-access_key = 'AKIAUL755PNF4ZMO5O52'
-secret_key = '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'
+access_key = ''
+secret_key = ''
 
 bytes_to_write = doj.to_csv(None, index = None, header = True).encode()
 fs = s3fs.S3FileSystem(key = access_key, secret = secret_key)
