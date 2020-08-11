@@ -1,4 +1,4 @@
-
+# This script uses an aggregation of COVID-19 research papers to create ML-generate topic-modeling metadata associated with each paper. 
 
 import os
 import zipfile
