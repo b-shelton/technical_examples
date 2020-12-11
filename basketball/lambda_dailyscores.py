@@ -161,8 +161,7 @@ def lambda_handler(event, context):
               # Get boxcores for each game
               # -------------------------------------------------------------------------
               team = []; player_uid=[]; player_name=[]; player_pos=[]; minutes=[]; fg=[]; three_pt=[]; ft=[];
-              oreb=[]; dreb=[]; reb=[]; ast=[]; stl=[]; blk=[]; to=[]; pf=[]; 
-              pts=[]; plusminus=[]; game_id=[]; 
+              oreb=[]; dreb=[]; reb=[]; ast=[]; stl=[]; blk=[]; to=[]; pf=[]; plusminus=[]; game_id=[]; 
               rem_game_id = []
               #
               for i in range(len(games)):
@@ -208,7 +207,7 @@ def lambda_handler(event, context):
                                     to.append('0')
                                     pf.append('0')
                                     plusminus.append('0')
-                                    pts.append('0')
+                                    pt.append('0')
                                   else:
                                     minutes.append(players[j].find_all('a')[0].findNext('td').get_text())
                                     fg.append(players[j].find_all('a')[0].findNext('td').findNext('td').get_text())
@@ -223,7 +222,7 @@ def lambda_handler(event, context):
                                     to.append(players[j].find_all('a')[0].findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').get_text())
                                     pf.append(players[j].find_all('a')[0].findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').get_text())
                                     plusminus.append(players[j].find_all('a')[0].findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').get_text())
-                                    pts.append(players[j].find_all('a')[0].findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').findNext('td').get_text())
+                                    pts.append(players[j].find_all('a')[0].findNext('td').get_text())
                               except:
                                   continue
                       if len(counter) > 0:
