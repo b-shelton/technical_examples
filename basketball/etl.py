@@ -8,7 +8,7 @@ import re
 from datetime import date
 import sys
 
-local_tmp = '/Users/ericashelton/Documents/tmp'
+local_tmp = '/tmp'
 
 
 
