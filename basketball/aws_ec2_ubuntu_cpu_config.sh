@@ -26,3 +26,12 @@ jupyter notebook --generate-config
 
 # Copy over the necessary security files from S3
 aws s3 cp s3://bshelt.aws.config/jupyter_notebook_config.py ~/.jupyter/
+
+sudo pip3 install --upgrade pip
+sudo pip3 install numpy
+sudo pip3 install pandas
+sudo pip3 install requests
+sudo pip3 install bs4
+sudo pip3 install s3fs
+sudo pip3 install matplotlib
+sudo pip3 install sklearn
