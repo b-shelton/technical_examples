@@ -7,11 +7,10 @@ import pandas_profiling
 import re
 import datetime as dt
 import sys
+from sklearn.model_selection import train_test_split
 
 
 local_tmp = '/home/ubuntu/tmp'
-
-
 
 # read the games from S3
 os.system(f'mkdir {local_tmp}')
@@ -335,8 +334,6 @@ final = final[['game_id',
                f'h_oreb_perc_st{x}',
                f'h_reb_at{x}',
                f'h_oreb_perc_at{x}',
-               'v_team_id',
-               'v_team',
                'v_winpct',
                f'v_pts_st{x}',
                f'v_pts_at{x}',
@@ -387,8 +384,26 @@ df = df.rename(columns = {'home_game_id': 'game_id'})
 
 df = pd.merge(games[['game_id', 'start_date']], df, on = 'game_id', how = 'inner')
 
+
+# split into training and test sets
+x_train, x_test, y_train, y_test = train_test_split(df.drop('label', axis = 1),
+                                                    df['label'],
+                                                    test_size = 0.20,
+                                                    random_state = 42)
+
+print('Training set shape = ' + str(x_train.shape))
+print('Testing set shape = ' + str(x_test.shape))
+
 # write to aws s3
-os.chdir('/home/ubuntu')
 today = str(dt.date.today())
-df.to_csv(f'base_data_{today}.gz')
-os.system(f'aws s3 cp /home/ubuntu/base_data_{today}.gz s3://b-shelton-sports/nba/ml/')
+os.chdir('/home/ubuntu')
+os.system(f'mkdir nba_mlp_data_{today}')
+os.chdir(f'nba_mlp_data_{today}')
+x_train.to_csv(f'nba_mlp_train_data_{today}.gz', index = False)
+x_test.to_csv(f'nba_mlp_test_data_{today}.gz', index = False)
+y_train.to_csv(f'nba_mlp_train_label_{today}.gz', index = False)
+y_test.to_csv(f'nba_mlp_test_label_{today}.gz', index = False)
+
+os.system(f'aws s3 cp /home/ubuntu/nba_mlp_data_{today} s3://b-shelton-sports/nba/ml/nba_mlp_data_{today}/ --recursive')
+
+os.system(f'rm -rf /home/ubuntu/nba_mlp_data_{today}')
