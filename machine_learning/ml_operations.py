@@ -1,6 +1,7 @@
 '''
 This file provides manual explanations of common machine learning functions
 '''
+import numpy as np
 import matplotlib.pyplot as plt
 
 # # Root Mean Squared Error
@@ -33,3 +34,6 @@ softmax_denom = np.sum([math.exp(j) for j in output_scores])
 softmax_probs = [math.exp(i) / softmax_denom for i in output_scores]
 print(f'The softmax probability of scores {output_scores} is {softmax_probs}.') 
 np.sum(softmax_probs)
+
+
+
